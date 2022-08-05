@@ -74,7 +74,7 @@ const BucketSummary = struct {
 const MAX_ATTEMPTS = 1000;
 
 /// A minimal perfect hash function for a given type and a hash function.
-fn HashFn(
+pub fn HashFn(
     comptime Key: type,
     comptime hasher: fn (seed: u64, Key: Key) u64,
     comptime Encoding: type,
@@ -221,7 +221,7 @@ fn HashFn(
     };
 }
 
-fn AutoHashFn(comptime Key: type) type {
+pub fn AutoHashFn(comptime Key: type) type {
     const hasher = struct {
         fn hash(seed: u64, key: Key) u64 {
             if (comptime std.meta.trait.hasUniqueRepresentation(Key)) {
