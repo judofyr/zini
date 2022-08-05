@@ -237,6 +237,8 @@ pub fn AutoHashFn(comptime Key: type) type {
     return HashFn(Key, hasher, CompactArray);
 }
 
+pub const BytesHashFn = HashFn([]const u8, Wyhash.hash, CompactArray);
+
 const testing = std.testing;
 
 test "basic bucketing" {
