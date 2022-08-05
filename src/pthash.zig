@@ -1,14 +1,22 @@
+//! This module implements "PTHash: Revisiting FCH Minimal Perfect Hashing" by
+//! Giulio Ermanno Pibiri, Roberto Trani, arXiv:2104.10402, https://arxiv.org/abs/2104.10402.
+
 const std = @import("std");
 const Wyhash = std.hash.Wyhash;
 
 const CompactArray = @import("./CompactArray.zig");
 
+/// The bucketer takes a hash and places it into a bucket in an un-even fashion:
+/// Roughly 60% of the keys are mapped to 30% of the buckets. In addition,
+/// it's initialize with a `c` parameter which represents the expected number of
+/// bits-per-n that is required to encode the pivots that are created by PTHash.
 const Bucketer = struct {
     n: usize,
     m: usize,
     p1: usize,
     p2: usize,
 
+    /// Creates a new bucketer for `n` items with a given `c` parameter.
     pub fn init(n: usize, c: usize) Bucketer {
         const m = c * n / (std.math.log2_int(usize, n) + 1);
         const p1 = @floatToInt(usize, 0.6 * @intToFloat(f64, n));
@@ -22,6 +30,7 @@ const Bucketer = struct {
         };
     }
 
+    /// Returns the bucket for a hash.
     pub fn getBucket(self: Bucketer, hash: u64) u64 {
         if (hash % self.n < self.p1) {
             return hash % self.p2;
@@ -31,6 +40,7 @@ const Bucketer = struct {
     }
 };
 
+/// Information about the hash + bucket for a key. We compute this once and re-use it.
 const HashedKey = struct {
     hash: u64,
     bucket: u64,
@@ -41,6 +51,8 @@ const HashedKey = struct {
     }
 };
 
+/// The bucket summary contains information about a single bucket for a slice of hashed keys.
+/// The slice should be sorted by bucket.
 const BucketSummary = struct {
     idx: usize,
     entry_start: usize,
