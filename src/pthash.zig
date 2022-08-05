@@ -34,6 +34,7 @@ const HashedKey = struct {
     bucket: u64,
 
     fn lessThan(_: void, lhs: HashedKey, rhs: HashedKey) bool {
+        if (lhs.bucket == rhs.bucket) return lhs.hash < rhs.hash;
         return lhs.bucket < rhs.bucket;
     }
 };
@@ -127,6 +128,8 @@ fn HashFn(
                     }) catch unreachable;
                     bucket_idx += 1;
                     bucket_start = i;
+                } else {
+                    if (entries[i - 1].hash == entries[i].hash) return error.HashCollision;
                 }
             }
 
@@ -223,4 +226,12 @@ test "building" {
             return error.TestCollision;
         }
     }
+}
+
+test "collision detection" {
+    var data: [2]u64 = .{ 5, 5 };
+    var h_result = AutoHashFn(u64).build(testing.allocator, &data, 7);
+    if (h_result) |*h| h.deinit(testing.allocator) else |_| {}
+
+    try testing.expectError(error.HashCollision, h_result);
 }
