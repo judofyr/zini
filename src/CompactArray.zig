@@ -63,7 +63,7 @@ pub fn setFromZero(self: *const Self, idx: usize, val: u64) void {
 
 /// Encodes an array into the smallest compact array possible.
 pub fn encode(allocator: std.mem.Allocator, data: []const u64) !Self {
-    const width = @intCast(IntLog2, std.math.log2_int_ceil(u64, std.mem.max(u64, data)));
+    const width = @intCast(IntLog2, std.math.log2_int(u64, std.mem.max(u64, data)) + 1);
     var arr = try init(allocator, width, data.len);
     for (data) |val, idx| {
         arr.setFromZero(idx, val);
@@ -101,6 +101,16 @@ test "encode" {
 
     // 100 fits in 6 bits. There's 12 elements. These 72 bits fit in 2 u64.
     try testing.expectEqual(@as(usize, 2), arr.data.len);
+
+    for (vals) |val, idx| {
+        try testing.expectEqual(val, arr.get(idx));
+    }
+}
+
+test "encode #2" {
+    const vals = [_]u64{ 0, 0, 2, 0, 4, 0 };
+    var arr = try Self.encode(testing.allocator, &vals);
+    defer arr.deinit(testing.allocator);
 
     for (vals) |val, idx| {
         try testing.expectEqual(val, arr.get(idx));
