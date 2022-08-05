@@ -1,6 +1,8 @@
 const std = @import("std");
 const Wyhash = std.hash.Wyhash;
 
+const CompactArray = @import("./CompactArray.zig");
+
 const Bucketer = struct {
     n: usize,
     m: usize,
@@ -63,6 +65,7 @@ const MAX_ATTEMPTS = 1000;
 fn HashFn(
     comptime Key: type,
     comptime hasher: fn (seed: u64, Key: Key) u64,
+    comptime Encoding: type,
 ) type {
     return struct {
         const Self = @This();
@@ -72,18 +75,18 @@ fn HashFn(
         bucketer: Bucketer,
         seed: u64,
 
-        // TODO: Pivots should be configurable type.
-        pivots: []u64,
+        pivots: Encoding,
 
         pub fn deinit(self: *Self, allocator: std.mem.Allocator) void {
-            allocator.free(self.pivots);
+            self.pivots.deinit(allocator);
             self.* = undefined;
         }
 
         pub fn get(self: *const Self, key: Key) u64 {
             const hash = hasher(self.seed, key);
             const bucket = self.bucketer.getBucket(hash);
-            const bucket_hash = Wyhash.hash(self.seed, std.mem.asBytes(&self.pivots[bucket]));
+            const pivot = self.pivots.get(bucket);
+            const bucket_hash = Wyhash.hash(self.seed, std.mem.asBytes(&pivot));
             const full_hash = Wyhash.hash(bucket_hash, std.mem.asBytes(&hash));
             return full_hash % self.bucketer.n;
         }
@@ -163,7 +166,8 @@ fn HashFn(
             defer attempted_taken.deinit();
 
             var pivots = try allocator.alloc(u64, bucketer.m);
-            errdefer allocator.free(pivots);
+            defer allocator.free(pivots);
+
             std.mem.set(u64, pivots, 0);
 
             while (bucket_summaries.removeOrNull()) |b| {
@@ -194,10 +198,12 @@ fn HashFn(
                 }
             }
 
+            const encoded_pivots = try Encoding.encode(allocator, pivots);
+
             return Self{
                 .bucketer = bucketer,
                 .seed = seed,
-                .pivots = pivots,
+                .pivots = encoded_pivots,
             };
         }
     };
@@ -216,7 +222,7 @@ fn AutoHashFn(comptime Key: type) type {
         }
     }.hash;
 
-    return HashFn(Key, hasher);
+    return HashFn(Key, hasher, CompactArray);
 }
 
 const testing = std.testing;
