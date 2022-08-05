@@ -56,6 +56,9 @@ const BucketSummary = struct {
     }
 };
 
+// Number of different seeds we try before we give up.
+const MAX_ATTEMPTS = 1000;
+
 /// A minimal perfect hash function for a given type and a hash function.
 fn HashFn(
     comptime Key: type,
@@ -90,10 +93,28 @@ fn HashFn(
             keys: []const Key,
             c: usize,
         ) !Self {
-            const bucketer = Bucketer.init(keys.len, c);
+            var seed: u64 = undefined;
 
-            var seed: u64 = 66904272; // random number
-            // try std.os.getrandom(std.mem.asBytes(&seed));
+            var attempts: usize = 0;
+            while (attempts < MAX_ATTEMPTS) : (attempts += 1) {
+                try std.os.getrandom(std.mem.asBytes(&seed));
+
+                return buildWithSeed(allocator, keys, c, seed) catch |err| switch (err) {
+                    error.HashCollision => continue,
+                    else => err,
+                };
+            }
+
+            return error.HashCollision;
+        }
+
+        pub fn buildWithSeed(
+            allocator: std.mem.Allocator,
+            keys: []const Key,
+            c: usize,
+            seed: u64,
+        ) !Self {
+            const bucketer = Bucketer.init(keys.len, c);
 
             // Step 1: Hash all the inputs and figure out which bucket they belong to.
 
