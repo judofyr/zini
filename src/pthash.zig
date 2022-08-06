@@ -4,6 +4,9 @@
 const std = @import("std");
 const Wyhash = std.hash.Wyhash;
 
+const CompactArray = @import("./CompactArray.zig");
+const FreeSlotEncoding = CompactArray;
+
 /// The bucketer takes a hash and places it into a bucket in an un-even fashion:
 /// Roughly 60% of the keys are mapped to 30% of the buckets. In addition,
 /// it's initialize with a `c` parameter which represents the expected number of
@@ -70,6 +73,7 @@ const BucketSummary = struct {
 
 pub const Params = struct {
     c: usize,
+    alpha: f64 = 1,
 };
 
 // Number of different seeds we try before we give up.
@@ -86,13 +90,15 @@ pub fn HashFn(
 
         const hasher = hasher;
 
-        bucketer: Bucketer,
+        n: usize,
         seed: u64,
-
+        bucketer: Bucketer,
+        free_slots: FreeSlotEncoding,
         pivots: Encoding,
 
         pub fn deinit(self: *Self, allocator: std.mem.Allocator) void {
             self.pivots.deinit(allocator);
+            self.free_slots.deinit(allocator);
             self.* = undefined;
         }
 
@@ -102,11 +108,16 @@ pub fn HashFn(
             const pivot = self.pivots.get(bucket);
             const bucket_hash = Wyhash.hash(self.seed, std.mem.asBytes(&pivot));
             const full_hash = Wyhash.hash(bucket_hash, std.mem.asBytes(&hash));
-            return full_hash % self.bucketer.n;
+            const pos = full_hash % self.bucketer.n;
+            if (pos < self.n) {
+                return pos;
+            } else {
+                return self.free_slots.get(pos - self.n);
+            }
         }
 
         pub fn bits(self: *const Self) usize {
-            return self.pivots.bits();
+            return self.pivots.bits() + self.free_slots.bits();
         }
 
         pub fn build(
@@ -135,7 +146,9 @@ pub fn HashFn(
             params: Params,
             seed: u64,
         ) !Self {
-            const bucketer = Bucketer.init(keys.len, params.c);
+            std.debug.assert(params.alpha <= 1);
+            const n_prime = @floatToInt(usize, @intToFloat(f64, keys.len) / params.alpha);
+            const bucketer = Bucketer.init(n_prime, params.c);
 
             // Step 1: Hash all the inputs and figure out which bucket they belong to.
 
@@ -177,10 +190,10 @@ pub fn HashFn(
 
             // Step 3: Determine pivots
 
-            var taken = try std.bit_set.DynamicBitSet.initEmpty(allocator, keys.len);
+            var taken = try std.bit_set.DynamicBitSet.initEmpty(allocator, bucketer.n);
             defer taken.deinit();
 
-            var attempted_taken = try std.bit_set.DynamicBitSet.initEmpty(allocator, keys.len);
+            var attempted_taken = try std.bit_set.DynamicBitSet.initEmpty(allocator, bucketer.n);
             defer attempted_taken.deinit();
 
             var pivots = try allocator.alloc(u64, bucketer.m);
@@ -218,8 +231,27 @@ pub fn HashFn(
 
             const encoded_pivots = try Encoding.encode(allocator, pivots);
 
+            var free_slots = try allocator.alloc(u64, bucketer.n - keys.len);
+            defer allocator.free(free_slots);
+
+            var iter = taken.iterator(.{ .kind = .unset });
+
+            var free_idx: usize = 0;
+            while (free_idx < free_slots.len) : (free_idx += 1) {
+                if (taken.isSet(keys.len + free_idx)) {
+                    free_slots[free_idx] = iter.next().?;
+                } else {
+                    // This value can be anything.
+                    free_slots[free_idx] = 0;
+                }
+            }
+
+            const encoded_free_slots = try FreeSlotEncoding.encode(allocator, free_slots);
+
             return Self{
                 .bucketer = bucketer,
+                .n = keys.len,
+                .free_slots = encoded_free_slots,
                 .seed = seed,
                 .pivots = encoded_pivots,
             };
@@ -251,7 +283,6 @@ pub fn BytesHashFn(comptime Encoding: type) type {
 }
 
 const testing = std.testing;
-const CompactArray = @import("./CompactArray.zig");
 
 test "basic bucketing" {
     const b = Bucketer.init(100, 7);
@@ -266,7 +297,7 @@ test "building" {
         data[i] = i * i;
     }
 
-    var h = try AutoHashFn(u64, CompactArray).build(testing.allocator, &data, .{ .c = 7 });
+    var h = try AutoHashFn(u64, CompactArray).build(testing.allocator, &data, .{ .c = 7, .alpha = 0.80 });
     defer h.deinit(testing.allocator);
 
     var seen = std.hash_map.AutoHashMap(u64, usize).init(testing.allocator);
@@ -274,6 +305,8 @@ test "building" {
 
     for (data) |val, idx| {
         const out = h.get(val);
+        try testing.expect(out < data.len);
+
         if (try seen.fetchPut(out, idx)) |other_entry| {
             std.debug.print("collision between idx={} and {}\n", .{ other_entry.value, idx });
             return error.TestCollision;
