@@ -103,6 +103,10 @@ pub fn HashFn(
             return full_hash % self.bucketer.n;
         }
 
+        pub fn bits(self: *const Self) usize {
+            return self.pivots.bits();
+        }
+
         pub fn build(
             allocator: std.mem.Allocator,
             keys: []const Key,

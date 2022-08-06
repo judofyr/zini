@@ -27,6 +27,10 @@ pub fn deinit(self: *Self, allocator: std.mem.Allocator) void {
     self.* = undefined;
 }
 
+pub fn bits(self: *const Self) usize {
+    return self.data.len * @bitSizeOf(Int);
+}
+
 fn getMask(self: *const Self) u64 {
     return (@as(Int, 1) << self.width) - 1;
 }
