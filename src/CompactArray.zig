@@ -67,6 +67,8 @@ pub fn setFromZero(self: *const Self, idx: usize, val: u64) void {
 
 /// Encodes an array into the smallest compact array possible.
 pub fn encode(allocator: std.mem.Allocator, data: []const u64) !Self {
+    if (data.len == 0) return Self{ .data = &[_]Int{}, .width = 1 };
+
     const width = @intCast(IntLog2, std.math.log2_int(u64, std.mem.max(u64, data)) + 1);
     var arr = try init(allocator, width, data.len);
     for (data) |val, idx| {
@@ -96,6 +98,11 @@ test "basic" {
         const value = (i * i) % max_val;
         try testing.expectEqual(value, c.get(i));
     }
+}
+
+test "encode empty" {
+    var arr = try Self.encode(testing.allocator, &[_]u64{});
+    defer arr.deinit(testing.allocator);
 }
 
 test "encode" {
