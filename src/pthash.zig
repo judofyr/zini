@@ -60,6 +60,13 @@ const BucketSummary = struct {
         return self.entry_end - self.entry_start;
     }
 
+    fn lessThan(_: void, a: BucketSummary, b: BucketSummary) bool {
+        const a_count = a.count();
+        const b_count = b.count();
+        if (a_count == b_count) return a.idx < b.idx;
+        return b_count < a_count;
+    }
+
     fn compare(_: void, a: BucketSummary, b: BucketSummary) std.math.Order {
         const a_count = a.count();
         const b_count = b.count();
@@ -148,10 +155,8 @@ pub fn HashFn(
 
             // Step 2: Group the entries into buckets ordered by size.
 
-            var bucket_summaries = std.PriorityQueue(BucketSummary, void, BucketSummary.compare).init(allocator, {});
+            var bucket_summaries = try std.ArrayList(BucketSummary).initCapacity(allocator, bucketer.m);
             defer bucket_summaries.deinit();
-
-            try bucket_summaries.ensureTotalCapacity(bucketer.m);
 
             var bucket_start: usize = 0;
             var bucket_idx: usize = 0;
@@ -159,17 +164,19 @@ pub fn HashFn(
             while (i < entries.len + 1) : (i += 1) {
                 const at_boundary = (i == entries.len) or (entries[i - 1].bucket != entries[i].bucket);
                 if (at_boundary) {
-                    bucket_summaries.add(BucketSummary{
+                    bucket_summaries.appendAssumeCapacity(BucketSummary{
                         .idx = entries[i - 1].bucket,
                         .entry_start = bucket_start,
                         .entry_end = i,
-                    }) catch unreachable;
+                    });
                     bucket_idx += 1;
                     bucket_start = i;
                 } else {
                     if (entries[i - 1].hash == entries[i].hash) return error.HashCollision;
                 }
             }
+
+            std.sort.sort(BucketSummary, bucket_summaries.items, {}, BucketSummary.lessThan);
 
             // Step 3: Determine pivots
 
@@ -184,7 +191,7 @@ pub fn HashFn(
 
             std.mem.set(u64, pivots, 0);
 
-            while (bucket_summaries.removeOrNull()) |b| {
+            for (bucket_summaries.items) |b| {
                 var pivot: u64 = 0;
                 find_pivot: while (true) : (pivot += 1) {
                     // Reset attempted_taken
