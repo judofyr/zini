@@ -4,8 +4,6 @@
 const std = @import("std");
 const Wyhash = std.hash.Wyhash;
 
-const CompactArray = @import("./CompactArray.zig");
-
 /// The bucketer takes a hash and places it into a bucket in an un-even fashion:
 /// Roughly 60% of the keys are mapped to 30% of the buckets. In addition,
 /// it's initialize with a `c` parameter which represents the expected number of
@@ -225,7 +223,10 @@ pub fn HashFn(
     };
 }
 
-pub fn AutoHashFn(comptime Key: type) type {
+pub fn AutoHashFn(
+    comptime Key: type,
+    comptime Encoding: type,
+) type {
     const hasher = struct {
         fn hash(seed: u64, key: Key) u64 {
             if (comptime std.meta.trait.hasUniqueRepresentation(Key)) {
@@ -238,12 +239,15 @@ pub fn AutoHashFn(comptime Key: type) type {
         }
     }.hash;
 
-    return HashFn(Key, hasher, CompactArray);
+    return HashFn(Key, hasher, Encoding);
 }
 
-pub const BytesHashFn = HashFn([]const u8, Wyhash.hash, CompactArray);
+pub fn BytesHashFn(comptime Encoding: type) type {
+    return HashFn([]const u8, Wyhash.hash, Encoding);
+}
 
 const testing = std.testing;
+const CompactArray = @import("./CompactArray.zig");
 
 test "basic bucketing" {
     const b = Bucketer.init(100, 7);
@@ -258,7 +262,7 @@ test "building" {
         data[i] = i * i;
     }
 
-    var h = try AutoHashFn(u64).build(testing.allocator, &data, 7);
+    var h = try AutoHashFn(u64, CompactArray).build(testing.allocator, &data, 7);
     defer h.deinit(testing.allocator);
 
     var seen = std.hash_map.AutoHashMap(u64, usize).init(testing.allocator);
@@ -275,7 +279,7 @@ test "building" {
 
 test "collision detection" {
     var data: [2]u64 = .{ 5, 5 };
-    var h_result = AutoHashFn(u64).build(testing.allocator, &data, 7);
+    var h_result = AutoHashFn(u64, CompactArray).build(testing.allocator, &data, 7);
     if (h_result) |*h| h.deinit(testing.allocator) else |_| {}
 
     try testing.expectError(error.HashCollision, h_result);
