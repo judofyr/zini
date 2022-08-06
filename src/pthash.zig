@@ -66,13 +66,6 @@ const BucketSummary = struct {
         if (a_count == b_count) return a.idx < b.idx;
         return b_count < a_count;
     }
-
-    fn compare(_: void, a: BucketSummary, b: BucketSummary) std.math.Order {
-        const a_count = a.count();
-        const b_count = b.count();
-        if (a_count == b_count) return std.math.order(a.idx, b.idx);
-        return std.math.order(a_count, b_count).invert();
-    }
 };
 
 pub const Params = struct {
