@@ -41,7 +41,7 @@ pub fn get(self: *const Self, idx: usize) u64 {
     const block = pos / @bitSizeOf(Int);
     const shift = @intCast(IntLog2, pos % @bitSizeOf(Int));
 
-    if (@as(Int, shift) + self.width < @bitSizeOf(Int)) {
+    if (@as(Int, shift) + self.width <= @bitSizeOf(Int)) {
         return (self.data[block] >> shift) & self.getMask();
     } else {
         const res_shift = ~shift + 1; //  =:=  @bitSizeOf(Int) - shift;
@@ -120,6 +120,16 @@ test "encode" {
 
 test "encode #2" {
     const vals = [_]u64{ 0, 0, 2, 0, 4, 0 };
+    var arr = try Self.encode(testing.allocator, &vals);
+    defer arr.deinit(testing.allocator);
+
+    for (vals) |val, idx| {
+        try testing.expectEqual(val, arr.get(idx));
+    }
+}
+
+test "encode #3" {
+    const vals = [_]u64{255} ** 64;
     var arr = try Self.encode(testing.allocator, &vals);
     defer arr.deinit(testing.allocator);
 
