@@ -2,9 +2,9 @@
 
 Zini (Zig + Mini) is a [Zig](https://ziglang.org/) library providing some succinct data structures.
 
-The main contribution is `zini.pthash` which is an implementation of [PTHash][pthash], a [**minimal perfect hash function**](https://en.wikipedia.org/wiki/Perfect_hash_function) construction algorithm.
+The main contribution is `zini.pthash` which is an implementation of [PTHash][pthash], a [minimal perfect hash function](https://en.wikipedia.org/wiki/Perfect_hash_function) construction algorithm.
 Given a set of `n` elements, with the only requirement being that you can hash them, it generates a hash function which maps each element to a distinct number between `0` and `n - 1`.
-The generated hash function is extremely small, typically consuming less than 5 _bits_ per element, regardless of the size of the input type.
+The generated hash function is extremely small, typically consuming less than **5 _bits_ per element**, regardless of the size of the input type.
 The algorithm provides multiple parameters to tune making it possible to optimize for (small) size, (short) construction time, or (short) lookup time.
 
 In addition, Zini provides structs for storing arrays of **64-bits numbers in a compact manner**:
