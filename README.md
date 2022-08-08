@@ -15,13 +15,14 @@ In comparison, the original file was 2.49 MB and compressing it with `gzip -9` o
 It should of course be noted that they don't store the equivalent data as you can't use the generated hash function to determine if a word is present or not in the list.
 The comparison is mainly useful to get a feeling of the magnitudes.
 
-In addition, Zini provides structs for storing arrays of **64-bits numbers in a compact manner**:
+In addition, Zini provides various functionality for dealing with arrays of numbers:
 
 - `zini.CompactArray` stores n-bit numbers tightly packed, leaving no bits unused.
   If the largest value in an array is `m` then you actually only need `n = log2(m) + 1` bits per element.
   E.g. if the largest value is 270, you will get 7x compression using CompactArray over `[]u64` as it stores each element using only 9 bits (and 64 divided by 9 is roughly 7).
 - `zini.DictArray` finds all distinct elements in the array, stores each once into a CompactArray (the dictionary), and creates a new CompactArray containing indexes into the dictionary.
   This will give excellent compression if there's a lot of repetition in the original array.
+- `zini.darray` provides constant-time support for the `select1(i)` operation which returns the _i_-th set bit in a `std.DynamicBitSetUnmanaged`.
 
 ## Acknowledgments
 
