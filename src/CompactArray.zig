@@ -93,11 +93,12 @@ pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
     var width = try r.readIntNative(Int);
     var len = try r.readIntNative(Int);
     const byte_len = len * @sizeOf(Int);
-    const data = stream.buffer[stream.pos .. stream.pos + byte_len];
+    const data = stream.buffer[stream.pos..][0..byte_len];
+    const aligned_data = @alignCast(@alignOf(Int), &data[0]);
     stream.pos += byte_len;
     return Self{
         .width = @intCast(IntLog2, width),
-        .data = @ptrCast([]Int, data),
+        .data = @ptrCast([]Int, @ptrCast([*]const Int, aligned_data)[0..len]),
     };
 }
 
