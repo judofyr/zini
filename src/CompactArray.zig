@@ -168,17 +168,19 @@ test "write and read" {
     var arr = try Self.encode(testing.allocator, &vals);
     defer arr.deinit(testing.allocator);
 
-    var buf: [100]u8 = undefined;
+    // ensure alignment
+    var buf = try testing.allocator.alignedAlloc(u8, @alignOf(u64), 100);
+    defer testing.allocator.free(buf);
 
     {
         // Write
-        var fbs = std.io.fixedBufferStream(&buf);
+        var fbs = std.io.fixedBufferStream(buf);
         try arr.writeTo(fbs.writer());
     }
 
     {
         // Read
-        var fbs = std.io.fixedBufferStream(@as([]const u8, &buf));
+        var fbs = std.io.fixedBufferStream(@as([]const u8, buf));
         var arr2 = try Self.readFrom(&fbs);
 
         for (vals) |val, idx| {
