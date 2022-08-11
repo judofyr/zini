@@ -39,6 +39,27 @@ const Bucketer = struct {
             return self.p2 + (hash % (self.m - self.p2));
         }
     }
+
+    pub fn writeTo(self: *const Bucketer, w: anytype) !void {
+        try w.writeIntNative(u64, self.n);
+        try w.writeIntNative(u64, self.m);
+        try w.writeIntNative(u64, self.p1);
+        try w.writeIntNative(u64, self.p2);
+    }
+
+    pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Bucketer {
+        var r = stream.reader();
+        const n = try r.readIntNative(u64);
+        const m = try r.readIntNative(u64);
+        const p1 = try r.readIntNative(u64);
+        const p2 = try r.readIntNative(u64);
+        return Bucketer{
+            .n = n,
+            .m = m,
+            .p1 = p1,
+            .p2 = p2,
+        };
+    }
 };
 
 /// Information about the hash + bucket for a key. We compute this once and re-use it.
@@ -254,6 +275,30 @@ pub fn HashFn(
                 .free_slots = encoded_free_slots,
                 .seed = seed,
                 .pivots = encoded_pivots,
+            };
+        }
+
+        pub fn writeTo(self: *const Self, w: anytype) !void {
+            try w.writeIntNative(u64, self.n);
+            try w.writeIntNative(u64, self.seed);
+            try self.bucketer.writeTo(w);
+            try self.free_slots.writeTo(w);
+            try self.pivots.writeTo(w);
+        }
+
+        pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
+            var r = stream.reader();
+            const n = try r.readIntNative(u64);
+            const seed = try r.readIntNative(u64);
+            const bucketer = try Bucketer.readFrom(stream);
+            const free_slots = try FreeSlotEncoding.readFrom(stream);
+            const pivots = try Encoding.readFrom(stream);
+            return Self{
+                .n = n,
+                .seed = seed,
+                .bucketer = bucketer,
+                .free_slots = free_slots,
+                .pivots = pivots,
             };
         }
     };

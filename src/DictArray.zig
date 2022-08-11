@@ -47,3 +47,17 @@ pub fn encode(allocator: std.mem.Allocator, data: []const u64) !Self {
         .arr = try CompactArray.encode(allocator, arr.items),
     };
 }
+
+pub fn writeTo(self: *const Self, w: anytype) !void {
+    try self.dict.writeTo(w);
+    try self.arr.writeTo(w);
+}
+
+pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
+    const dict = try CompactArray.readFrom(stream);
+    const arr = try CompactArray.readFrom(stream);
+    return Self{
+        .dict = dict,
+        .arr = arr,
+    };
+}

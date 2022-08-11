@@ -77,6 +77,30 @@ pub fn encode(allocator: std.mem.Allocator, data: []const u64) !Self {
     return arr;
 }
 
+/// Writes the array into an std.io.Writer. This can be read using `readFrom`.
+pub fn writeTo(self: *const Self, w: anytype) !void {
+    try w.writeIntNative(Int, self.width);
+    try w.writeIntNative(Int, self.data.len);
+    const byte_len = self.data.len * @sizeOf(Int);
+    try w.writeAll(@ptrCast([*]const u8, &self.data[0])[0..byte_len]);
+}
+
+/// Reads an array from a buffer. Note that this will not allocate, but will
+/// instead create a new CompactArray which points directly to the data in
+/// the buffer.
+pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
+    var r = stream.reader();
+    var width = try r.readIntNative(Int);
+    var len = try r.readIntNative(Int);
+    const byte_len = len * @sizeOf(Int);
+    const data = stream.buffer[stream.pos .. stream.pos + byte_len];
+    stream.pos += byte_len;
+    return Self{
+        .width = @intCast(IntLog2, width),
+        .data = @ptrCast([]Int, data),
+    };
+}
+
 const testing = std.testing;
 
 test "basic" {
@@ -135,5 +159,29 @@ test "encode #3" {
 
     for (vals) |val, idx| {
         try testing.expectEqual(val, arr.get(idx));
+    }
+}
+
+test "write and read" {
+    const vals = [_]u64{ 0, 0, 2, 0, 4, 0 };
+    var arr = try Self.encode(testing.allocator, &vals);
+    defer arr.deinit(testing.allocator);
+
+    var buf: [100]u8 = undefined;
+
+    {
+        // Write
+        var fbs = std.io.fixedBufferStream(&buf);
+        try arr.writeTo(fbs.writer());
+    }
+
+    {
+        // Read
+        var fbs = std.io.fixedBufferStream(@as([]const u8, &buf));
+        var arr2 = try Self.readFrom(&fbs);
+
+        for (vals) |val, idx| {
+            try testing.expectEqual(val, arr2.get(idx));
+        }
     }
 }
