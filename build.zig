@@ -4,6 +4,7 @@ pub fn build(b: *std.build.Builder) void {
     // Standard release options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const mode = b.standardReleaseOptions();
+    const target = b.standardTargetOptions(.{});
 
     const lib = b.addStaticLibrary("zig-pthash", "src/main.zig");
     lib.setBuildMode(mode);
@@ -14,4 +15,11 @@ pub fn build(b: *std.build.Builder) void {
 
     const test_step = b.step("test", "Run library tests");
     test_step.dependOn(&main_tests.step);
+
+    const exe_pthash = b.addExecutable("zini-pthash", "tools/zini-pthash/main.zig");
+    exe_pthash.addPackagePath("zini", "src/main.zig");
+    exe_pthash.addPackagePath("parg", "../parg/src/parser.zig");
+    exe_pthash.setTarget(target);
+    exe_pthash.setBuildMode(mode);
+    exe_pthash.install();
 }
