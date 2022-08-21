@@ -109,8 +109,6 @@ pub fn HashFn(
     return struct {
         const Self = @This();
 
-        const hasher = hasher;
-
         n: usize,
         seed: u64,
         bucketer: Bucketer,
