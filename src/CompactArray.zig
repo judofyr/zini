@@ -1,6 +1,8 @@
 /// CompactArray stores a list of n-bit integers packed tightly.
 const std = @import("std");
 
+const utils = @import("./utils.zig");
+
 const Self = @This();
 
 const Int = u64;
@@ -80,9 +82,7 @@ pub fn encode(allocator: std.mem.Allocator, data: []const u64) !Self {
 /// Writes the array into an std.io.Writer. This can be read using `readFrom`.
 pub fn writeTo(self: *const Self, w: anytype) !void {
     try w.writeIntNative(Int, self.width);
-    try w.writeIntNative(Int, self.data.len);
-    const byte_len = self.data.len * @sizeOf(Int);
-    try w.writeAll(@ptrCast([*]const u8, &self.data[0])[0..byte_len]);
+    try utils.writeSlice(w, self.data);
 }
 
 /// Reads an array from a buffer. Note that this will not allocate, but will
@@ -91,14 +91,10 @@ pub fn writeTo(self: *const Self, w: anytype) !void {
 pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
     var r = stream.reader();
     var width = try r.readIntNative(Int);
-    var len = try r.readIntNative(Int);
-    const byte_len = len * @sizeOf(Int);
-    const data = stream.buffer[stream.pos..][0..byte_len];
-    const aligned_data = @alignCast(@alignOf(Int), &data[0]);
-    stream.pos += byte_len;
+    var data = try utils.readSlice(stream, Int);
     return Self{
         .width = @intCast(IntLog2, width),
-        .data = @ptrCast([]Int, @ptrCast([*]const Int, aligned_data)[0..len]),
+        .data = data,
     };
 }
 

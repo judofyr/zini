@@ -7,8 +7,13 @@
 //! The code is heavily based on https://github.com/jermp/pthash/blob/master/include/encoders/darray.hpp.
 
 const std = @import("std");
+const utils = @import("./utils.zig");
 
 const BitSet = std.bit_set.DynamicBitSet;
+
+fn bitSizeOfArray(arr: anytype) u64 {
+    return arr.len * @bitSizeOf(@TypeOf(arr[0]));
+}
 
 pub fn DArray(comptime val: bool) type {
     return struct {
@@ -150,6 +155,29 @@ pub fn DArray(comptime val: bool) type {
             }
 
             return (word_idx << 6) + word_pos;
+        }
+
+        pub fn bits(self: *const Self) u64 {
+            return bitSizeOfArray(self.block_inventory) +
+                bitSizeOfArray(self.subblock_inventory) +
+                bitSizeOfArray(self.overflow_positions);
+        }
+
+        pub fn writeTo(self: *const Self, w: anytype) !void {
+            try utils.writeSlice(w, self.block_inventory);
+            try utils.writeSlice(w, self.subblock_inventory);
+            try utils.writeSlice(w, self.overflow_positions);
+        }
+
+        pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
+            var block_inventory = try utils.readSlice(stream, BlockPosition);
+            var subblock_inventory = try utils.readSlice(stream, u16);
+            var overflow_positions = try utils.readSlice(stream, u64);
+            return Self{
+                .block_inventory = block_inventory,
+                .subblock_inventory = subblock_inventory,
+                .overflow_positions = overflow_positions,
+            };
         }
     };
 }

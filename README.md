@@ -22,6 +22,7 @@ In addition, Zini provides various functionality for dealing with arrays of numb
   E.g. if the largest value is 270, you will get 7x compression using CompactArray over `[]u64` as it stores each element using only 9 bits (and 64 divided by 9 is roughly 7).
 - `zini.DictArray` finds all distinct elements in the array, stores each once into a CompactArray (the dictionary), and creates a new CompactArray containing indexes into the dictionary.
   This will give excellent compression if there's a lot of repetition in the original array.
+- `zini.EliasFano` stores increasing 64-bit numbers in a compact manner.
 - `zini.darray` provides constant-time support for the `select1(i)` operation which returns the _i_-th set bit in a `std.DynamicBitSetUnmanaged`.
 
 ## Acknowledgments

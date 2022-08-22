@@ -5,7 +5,8 @@ const std = @import("std");
 const Wyhash = std.hash.Wyhash;
 
 const CompactArray = @import("./CompactArray.zig");
-const FreeSlotEncoding = CompactArray;
+const EliasFano = @import("./EliasFano.zig");
+const FreeSlotEncoding = EliasFano;
 
 /// The bucketer takes a hash and places it into a bucket in an un-even fashion:
 /// Roughly 60% of the keys are mapped to 30% of the buckets. In addition,
@@ -269,13 +270,15 @@ pub fn HashFn(
 
             var iter = taken.iterator(.{ .kind = .unset });
 
+            var prev_free_value: usize = 0;
             var free_idx: usize = 0;
             while (free_idx < free_slots.len) : (free_idx += 1) {
                 if (taken.isSet(keys.len + free_idx)) {
                     free_slots[free_idx] = iter.next().?;
+                    prev_free_value = free_slots[free_idx];
                 } else {
-                    // This value can be anything.
-                    free_slots[free_idx] = 0;
+                    // This value can be anything. We keep it incremental.
+                    free_slots[free_idx] = prev_free_value;
                 }
             }
 
