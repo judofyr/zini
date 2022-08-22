@@ -11,10 +11,6 @@ const utils = @import("./utils.zig");
 
 const BitSet = std.bit_set.DynamicBitSet;
 
-fn bitSizeOfArray(arr: anytype) u64 {
-    return arr.len * @bitSizeOf(@TypeOf(arr[0]));
-}
-
 pub fn DArray(comptime val: bool) type {
     return struct {
         const Self = @This();
@@ -158,9 +154,9 @@ pub fn DArray(comptime val: bool) type {
         }
 
         pub fn bits(self: *const Self) u64 {
-            return bitSizeOfArray(self.block_inventory) +
-                bitSizeOfArray(self.subblock_inventory) +
-                bitSizeOfArray(self.overflow_positions);
+            return utils.bitSizeOfSlice(self.block_inventory) +
+                utils.bitSizeOfSlice(self.subblock_inventory) +
+                utils.bitSizeOfSlice(self.overflow_positions);
         }
 
         pub fn writeTo(self: *const Self, w: anytype) !void {

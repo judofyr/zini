@@ -30,7 +30,7 @@ pub fn deinit(self: *Self, allocator: std.mem.Allocator) void {
 }
 
 pub fn bits(self: *const Self) usize {
-    return self.data.len * @bitSizeOf(Int);
+    return utils.bitSizeOfSlice(self.data);
 }
 
 fn getMask(self: *const Self) u64 {
