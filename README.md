@@ -62,11 +62,14 @@ $ zig build -Drelease-safe
 # Build a hash function:
 $ ./zig-out/bin/zini-pthash build -i /usr/share/dict/words -o words.pth
 Reading /usr/share/dict/words...
+
 Building hash function...
+
 Successfully built hash function:
   seed: 12323441790160983030
   bits: 865554
   bits/n: 3.6693741892269993
+
 Writing to words.pth
 
 # Look up an index in the hash function:

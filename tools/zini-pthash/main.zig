@@ -131,13 +131,17 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
         try keys.append(split.next().?);
     }
 
+    std.debug.print("\n", .{});
     std.debug.print("Building hash function...\n", .{});
     var hash = try HashFn.build(allocator, keys.items, params, seed);
     defer hash.deinit(allocator);
+
+    std.debug.print("\n", .{});
     std.debug.print("Successfully built hash function:\n", .{});
     try printHashStats(hash);
 
     if (output) |o| {
+        std.debug.print("\n", .{});
         std.debug.print("Writing to {s}\n", .{o});
         const outfile = try std.fs.cwd().createFile(o, .{});
         defer outfile.close();
