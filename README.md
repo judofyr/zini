@@ -8,9 +8,9 @@ The generated hash function is extremely small, typically consuming less than **
 The algorithm provides multiple parameters to tune making it possible to optimize for (small) size, (short) construction time, or (short) lookup time.
 
 To give a practical example:
-In ~0.7 seconds Zini was able to create a hash function for /usr/share/dict/words containing 235886 words.
-The resulting hash function required in total 1053568 bits in memory.
-This corresponds to 131.7 kB in total or 4.47 bits per word.
+In ~0.6 seconds Zini was able to create a hash function for /usr/share/dict/words containing 235886 words.
+The resulting hash function required in total 865682 bits in memory.
+This corresponds to 131.7 kB in total or 3.67 bits per word.
 In comparison, the original file was 2.49 MB and compressing it with `gzip -9` only gets it down to 754 kB (which you can't use directly in memory without decompressing it).
 It should of course be noted that they don't store the equivalent data as you can't use the generated hash function to determine if a word is present or not in the list.
 The comparison is mainly useful to get a feeling of the magnitudes.
