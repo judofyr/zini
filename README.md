@@ -25,6 +25,63 @@ In addition, Zini provides various functionality for dealing with arrays of numb
 - `zini.EliasFano` stores increasing 64-bit numbers in a compact manner.
 - `zini.darray` provides constant-time support for the `select1(i)` operation which returns the _i_-th set bit in a `std.DynamicBitSetUnmanaged`.
 
+## Usage
+
+Zini is intended to be used as a library, but also ships the command-line tool `zini-pthash`.
+As the documentation is a bit lacking it might be useful to look through `tools/zini-pthash/main.zig` to understand how it's used.
+
+Note that building `zini-pthash` depends on having [parg](https://github.com/judofyr/parg) cloned in `../parg`.
+You may want to tweak this in `build.zig`.
+
+```
+USAGE
+  ./zig-out/bin/zini-pthash [build | lookup] <options>
+
+COMMAND: build
+  Builds hash function for plain text file.
+
+  -i, --input <file>
+  -o, --output <file>
+  -c <int>
+  -a, --alpha <float>
+  -s, --seed <int>
+
+COMMAND: lookup
+
+  -i, --input <file>
+  -k, --key <key>
+  -b, --benchmark
+```
+
+And here's an example run of using `zini-pthash`.
+
+```
+# Build zini-pthash:
+$ zig build -Drelease-safe
+
+# Build a hash function:
+$ ./zig-out/bin/zini-pthash build -i /usr/share/dict/words -o words.pth
+Reading /usr/share/dict/words...
+Building hash function...
+Successfully built hash function:
+  seed: 12323441790160983030
+  bits: 865554
+  bits/n: 3.6693741892269993
+Writing to words.pth
+
+# Look up an index in the hash function:
+$ ./zig-out/bin/zini-pthash lookup -i words.pth --key hello
+Reading words.pth...
+
+Successfully loaded hash function:
+  seed: 12323441790160983030
+  bits: 865554
+  bits/n: 3.6693741892269993
+
+Looking up key=hello:
+112576
+```
+
 ## Acknowledgments
 
 Zini is merely an implementation of existing algorithms and techniques already described in the literature:
