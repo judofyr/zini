@@ -33,7 +33,7 @@ pub fn encode(allocator: std.mem.Allocator, data: []const u64) !Self {
 
     var low_bits = try CompactArray.init(allocator, l, data.len);
 
-    for (data) |num, idx| {
+    for (data, 0..) |num, idx| {
         if (l > 0) {
             low_bits.setFromZero(idx, num & l_mask);
         }
@@ -107,7 +107,7 @@ test "encode" {
     defer ef.deinit(testing.allocator);
 
     // Check that it matches
-    for (result.items) |num, idx| {
+    for (result.items, 0..) |num, idx| {
         try testing.expectEqual(num, ef.get(idx));
     }
 }

@@ -73,7 +73,7 @@ pub fn encode(allocator: std.mem.Allocator, data: []const u64) !Self {
 
     const width = @intCast(IntLog2, std.math.log2_int(u64, std.mem.max(u64, data)) + 1);
     var arr = try init(allocator, width, data.len);
-    for (data) |val, idx| {
+    for (data, 0..) |val, idx| {
         arr.setFromZero(idx, val);
     }
     return arr;
@@ -134,7 +134,7 @@ test "encode" {
     // 100 fits in 6 bits. There's 12 elements. These 72 bits fit in 2 u64.
     try testing.expectEqual(@as(usize, 2), arr.data.len);
 
-    for (vals) |val, idx| {
+    for (vals, 0..) |val, idx| {
         try testing.expectEqual(val, arr.get(idx));
     }
 }
@@ -144,7 +144,7 @@ test "encode #2" {
     var arr = try Self.encode(testing.allocator, &vals);
     defer arr.deinit(testing.allocator);
 
-    for (vals) |val, idx| {
+    for (vals, 0..) |val, idx| {
         try testing.expectEqual(val, arr.get(idx));
     }
 }
@@ -154,7 +154,7 @@ test "encode #3" {
     var arr = try Self.encode(testing.allocator, &vals);
     defer arr.deinit(testing.allocator);
 
-    for (vals) |val, idx| {
+    for (vals, 0..) |val, idx| {
         try testing.expectEqual(val, arr.get(idx));
     }
 }
@@ -179,7 +179,7 @@ test "write and read" {
         var fbs = std.io.fixedBufferStream(@as([]const u8, buf));
         var arr2 = try Self.readFrom(&fbs);
 
-        for (vals) |val, idx| {
+        for (vals, 0..) |val, idx| {
             try testing.expectEqual(val, arr2.get(idx));
         }
     }

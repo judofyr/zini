@@ -19,7 +19,7 @@ pub fn readSlice(stream: *std.io.FixedBufferStream([]const u8), T: anytype) ![]T
     const aligned_data = @alignCast(@alignOf(T), &data[0]);
     stream.pos += byte_len;
     stream.pos += byte_len % @alignOf(u64);
-    return @ptrCast([]T, @ptrCast([*]const T, aligned_data)[0..len]);
+    return @constCast(@ptrCast([*]const T, aligned_data)[0..len]);
 }
 
 pub fn bitSizeOfSlice(arr: anytype) u64 {

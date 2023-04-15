@@ -1,25 +1,34 @@
 const std = @import("std");
 
 pub fn build(b: *std.build.Builder) void {
-    // Standard release options allow the person running `zig build` to select
-    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
-    const mode = b.standardReleaseOptions();
+    const optimize = b.standardOptimizeOption(.{});
     const target = b.standardTargetOptions(.{});
 
-    const lib = b.addStaticLibrary("zig-pthash", "src/main.zig");
-    lib.setBuildMode(mode);
-    lib.install();
+    const zini = b.addModule("zini", .{
+        .source_file = .{ .path = "src/main.zig" },
+    });
 
-    const main_tests = b.addTest("src/main.zig");
-    main_tests.setBuildMode(mode);
+    const tests = b.addTest(.{
+        .root_source_file = .{ .path = "src/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    const tests_run_step = b.addRunArtifact(tests);
 
-    const test_step = b.step("test", "Run library tests");
-    test_step.dependOn(&main_tests.step);
+    const test_step = b.step("test", "Run unit tests");
+    test_step.dependOn(&tests_run_step.step);
 
-    const exe_pthash = b.addExecutable("zini-pthash", "tools/zini-pthash/main.zig");
-    exe_pthash.addPackagePath("zini", "src/main.zig");
-    exe_pthash.addPackagePath("parg", "../parg/src/parser.zig");
-    exe_pthash.setTarget(target);
-    exe_pthash.setBuildMode(mode);
-    exe_pthash.install();
+    const parg = b.createModule(.{ .source_file = .{
+        .path = "../parg/src/parser.zig",
+    } });
+
+    const pthash = b.addExecutable(.{
+        .name = "zini-pthash",
+        .root_source_file = .{ .path = "tools/zini-pthash/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    pthash.addModule("zini", zini);
+    pthash.addModule("parg", parg);
+    b.installArtifact(pthash);
 }

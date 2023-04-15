@@ -189,7 +189,7 @@ pub fn HashFn(
             var entries = try allocator.alloc(HashedKey, keys.len);
             defer allocator.free(entries);
 
-            for (keys) |key, idx| {
+            for (keys, 0..) |key, idx| {
                 const hash = hasher(seed, key);
                 const bucket = bucketer.getBucket(hash);
                 entries[idx] = HashedKey{ .hash = hash, .bucket = bucket };
@@ -363,7 +363,7 @@ test "building" {
     var seen = std.hash_map.AutoHashMap(u64, usize).init(testing.allocator);
     defer seen.deinit();
 
-    for (data) |val, idx| {
+    for (data, 0..) |val, idx| {
         const out = h.get(val);
         try testing.expect(out < data.len);
 

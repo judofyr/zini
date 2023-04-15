@@ -56,9 +56,9 @@ pub fn DArray(comptime val: bool) type {
             }
 
             return Self{
-                .block_inventory = block_inventory.toOwnedSlice(allocator),
-                .subblock_inventory = subblock_inventory.toOwnedSlice(allocator),
-                .overflow_positions = overflow_positions.toOwnedSlice(allocator),
+                .block_inventory = try block_inventory.toOwnedSlice(allocator),
+                .subblock_inventory = try subblock_inventory.toOwnedSlice(allocator),
+                .overflow_positions = try overflow_positions.toOwnedSlice(allocator),
             };
         }
 
@@ -130,7 +130,7 @@ pub fn DArray(comptime val: bool) type {
             word &= @bitCast(u64, @as(i64, -1)) << word_shift;
 
             while (true) {
-                var popcount = @popCount(u64, word);
+                var popcount = @popCount(word);
                 if (reminder < popcount) break;
                 reminder -= popcount;
                 word_idx += 1;
@@ -193,7 +193,7 @@ fn testBitSet(
     var darr1 = try DArray1.init(testing.allocator, bit_set.unmanaged);
     defer darr1.deinit(testing.allocator);
 
-    for (positions) |pos, idx| {
+    for (positions, 0..) |pos, idx| {
         try testing.expectEqual(pos, darr1.select(bit_set.unmanaged, idx));
     }
 
@@ -203,7 +203,7 @@ fn testBitSet(
     var darr0 = try DArray0.init(testing.allocator, bit_set.unmanaged);
     defer darr0.deinit(testing.allocator);
 
-    for (positions) |pos, idx| {
+    for (positions, 0..) |pos, idx| {
         try testing.expectEqual(pos, darr0.select(bit_set.unmanaged, idx));
     }
 }

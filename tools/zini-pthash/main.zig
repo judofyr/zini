@@ -328,7 +328,7 @@ const StringDictBuilder = struct {
 
     pub fn build(self: *StringDictBuilder) !StringDict {
         return StringDict{
-            .dict = self.dict_values.toOwnedSlice(),
+            .dict = try self.dict_values.toOwnedSlice(),
             .arr = try zini.DictArray.encode(self.dict_values.allocator, self.arr),
         };
     }
