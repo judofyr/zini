@@ -14,6 +14,7 @@ pub fn build(b: *std.build.Builder) void {
         .optimize = optimize,
     });
     const tests_run_step = b.addRunArtifact(tests);
+    tests_run_step.has_side_effects = true;
 
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&tests_run_step.step);
