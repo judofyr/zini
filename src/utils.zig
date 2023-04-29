@@ -25,3 +25,31 @@ pub fn readSlice(stream: *std.io.FixedBufferStream([]const u8), T: anytype) ![]T
 pub fn bitSizeOfSlice(arr: anytype) u64 {
     return arr.len * @bitSizeOf(@TypeOf(arr[0]));
 }
+
+pub fn autoHash(comptime Key: type) fn (seed: u64, key: Key) u64 {
+    return struct {
+        fn hash(seed: u64, key: Key) u64 {
+            if (comptime std.meta.trait.hasUniqueRepresentation(Key)) {
+                return std.hash.Wyhash.hash(seed, std.mem.asBytes(&key));
+            } else {
+                var hasher = std.hash.Wyhash.init(seed);
+                std.hash.autoHash(&hasher, key);
+                return hasher.final();
+            }
+        }
+    }.hash;
+}
+
+pub fn testFailingAllocator(comptime t: fn (allocator: std.mem.Allocator) anyerror!void) !void {
+    var idx: usize = 0;
+    while (true) : (idx += 1) {
+        var failing_alloc = std.testing.FailingAllocator.init(std.testing.allocator, idx);
+
+        try (t(failing_alloc.allocator()) catch |err| switch (err) {
+            error.OutOfMemory => continue,
+            else => err,
+        });
+
+        return;
+    }
+}

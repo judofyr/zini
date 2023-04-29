@@ -6,6 +6,7 @@ const Wyhash = std.hash.Wyhash;
 
 const CompactArray = @import("./CompactArray.zig");
 const EliasFano = @import("./EliasFano.zig");
+const utils = @import("./utils.zig");
 const FreeSlotEncoding = EliasFano;
 
 /// The bucketer takes a hash and places it into a bucket in an un-even fashion:
@@ -323,19 +324,7 @@ pub fn AutoHashFn(
     comptime Key: type,
     comptime Encoding: type,
 ) type {
-    const hasher = struct {
-        fn hash(seed: u64, key: Key) u64 {
-            if (comptime std.meta.trait.hasUniqueRepresentation(Key)) {
-                return Wyhash.hash(seed, std.mem.asBytes(&key));
-            } else {
-                var hasher = Wyhash.init(seed);
-                std.hash.autoHash(&hasher, key);
-                return hasher.final();
-            }
-        }
-    }.hash;
-
-    return HashFn(Key, hasher, Encoding);
+    return HashFn(Key, utils.autoHash(Key), Encoding);
 }
 
 pub fn BytesHashFn(comptime Encoding: type) type {
