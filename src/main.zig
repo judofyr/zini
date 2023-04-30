@@ -6,6 +6,7 @@ pub const DictArray = @import("./DictArray.zig");
 pub const darray = @import("./darray.zig");
 pub const EliasFano = @import("./EliasFano.zig");
 pub const ribbon = @import("./ribbon.zig");
+pub const StringDict = @import("./StringDict.zig");
 
 comptime {
     std.testing.refAllDecls(@This());

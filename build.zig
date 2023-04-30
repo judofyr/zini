@@ -32,4 +32,14 @@ pub fn build(b: *std.build.Builder) void {
     pthash.addModule("zini", zini);
     pthash.addModule("parg", parg);
     b.installArtifact(pthash);
+
+    const ribbon = b.addExecutable(.{
+        .name = "zini-ribbon",
+        .root_source_file = .{ .path = "tools/zini-ribbon/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    ribbon.addModule("zini", zini);
+    ribbon.addModule("parg", parg);
+    b.installArtifact(ribbon);
 }

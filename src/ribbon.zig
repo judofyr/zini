@@ -45,6 +45,19 @@ const RibbonTable = struct {
         }
         return result;
     }
+
+    pub fn bits(self: *const Self) u64 {
+        return self.data.bits();
+    }
+
+    pub fn writeTo(self: *const Self, w: anytype) !void {
+        try self.data.writeTo(w);
+    }
+
+    pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
+        var data = try CompactArray.readFrom(stream);
+        return Self{ .data = data };
+    }
 };
 
 pub const RibbonBandingSystem = struct {
@@ -193,9 +206,34 @@ pub fn Ribbon(
             self.* = undefined;
         }
 
-        pub fn lookup(self: *Self, key: Key) u64 {
+        pub fn lookup(self: *const Self, key: Key) u64 {
             const h = hashKey(self.seed, key, self.n, self.w);
             return self.table.lookup(h.i, h.c);
+        }
+
+        pub fn bits(self: *const Self) u64 {
+            return self.table.bits();
+        }
+
+        pub fn writeTo(self: *const Self, w: anytype) !void {
+            try w.writeIntNative(u64, self.n);
+            try w.writeIntNative(u64, self.w);
+            try w.writeIntNative(u64, self.seed);
+            try self.table.writeTo(w);
+        }
+
+        pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
+            var r = stream.reader();
+            const n = try r.readIntNative(u64);
+            const w = try r.readIntNative(u64);
+            const seed = try r.readIntNative(u64);
+            const table = try RibbonTable.readFrom(stream);
+            return Self{
+                .n = n,
+                .w = @intCast(u6, w),
+                .seed = seed,
+                .table = table,
+            };
         }
 
         /// IncrementalBuilder builds the Ribbon table incrementally:
@@ -249,15 +287,15 @@ pub fn Ribbon(
             };
 
             n: usize,
-            opts: BuildOptions,
+            seed: u64,
             input: std.ArrayListUnmanaged(Input),
 
-            pub fn init(allocator: std.mem.Allocator, n: usize, opts: BuildOptions) error{OutOfMemory}!IterativeBuilder {
+            pub fn init(allocator: std.mem.Allocator, n: usize, seed: u64) error{OutOfMemory}!IterativeBuilder {
                 var input = try std.ArrayListUnmanaged(Input).initCapacity(allocator, n);
 
                 return IterativeBuilder{
                     .n = n,
-                    .opts = opts,
+                    .seed = seed,
                     .input = input,
                 };
             }
@@ -270,25 +308,38 @@ pub fn Ribbon(
             pub fn insert(self: *IterativeBuilder, key: Key, value: u64) void {
                 self.input.appendAssumeCapacity(
                     Input{
-                        .hash1 = hasher(self.opts.seed, key),
-                        .hash2 = hasher(self.opts.seed + 1, key),
+                        .hash1 = hasher(self.seed, key),
+                        .hash2 = hasher(self.seed + 1, key),
                         .value = value,
                     },
                 );
             }
 
-            pub fn build(self: IterativeBuilder, allocator: std.mem.Allocator) error{ OutOfMemory, HashCollision }!Self {
+            pub fn insertWithAllocator(self: *IterativeBuilder, allocator: std.mem.Allocator, key: Key, value: u64) error{OutOfMemory}!void {
+                try self.input.append(
+                    allocator,
+                    Input{
+                        .hash1 = hasher(self.seed, key),
+                        .hash2 = hasher(self.seed + 1, key),
+                        .value = value,
+                    },
+                );
+            }
+
+            pub fn build(self: IterativeBuilder, allocator: std.mem.Allocator, opts: BuildOptions) error{ OutOfMemory, HashCollision }!Self {
+                std.debug.assert(self.seed == opts.seed);
+
                 const n = self.input.items.len;
                 const step = @max(n / 10, 1);
                 var m: usize = n;
 
                 var i: usize = 0;
                 loop: while (i < 50) : (i += 1) {
-                    var system = try RibbonBandingSystem.init(allocator, m, self.opts.r, self.opts.w);
+                    var system = try RibbonBandingSystem.init(allocator, m, opts.r, opts.w);
                     defer system.deinit(allocator);
 
                     for (self.input.items) |input| {
-                        const h = splitHash(input.hash1, input.hash2, m, self.opts.w);
+                        const h = splitHash(input.hash1, input.hash2, m, opts.w);
                         const insert_result = system.insertRow(h.i, h.c, input.value);
                         switch (insert_result) {
                             .failure => {
@@ -303,8 +354,8 @@ pub fn Ribbon(
 
                     return Self{
                         .n = m,
-                        .w = self.opts.w,
-                        .seed = self.opts.seed,
+                        .w = opts.w,
+                        .seed = opts.seed,
                         .table = table,
                     };
                 }
@@ -439,7 +490,7 @@ const RibbonIterativeTest = struct {
     }
 
     fn init(self: *Self) !void {
-        self.builder = try RibbonU64.IterativeBuilder.init(self.allocator, self.n, self.options());
+        self.builder = try RibbonU64.IterativeBuilder.init(self.allocator, self.n, self.options().seed);
     }
 
     fn insert(self: *Self, key: u64, value: u64) !void {
@@ -447,7 +498,7 @@ const RibbonIterativeTest = struct {
     }
 
     fn build(self: *Self) !void {
-        self.table = try self.builder.?.build(self.allocator);
+        self.table = try self.builder.?.build(self.allocator, self.options());
     }
 
     fn lookup(self: *Self, key: u64) u64 {
