@@ -735,7 +735,12 @@ pub fn Ribbon(
                     }
                 }
 
-                while (layers.len < layers.capacity() and self.layer_builder.input.items.len >= 2048) {
+                while (layers.len < layers.capacity()) {
+                    if (layers.len > 1 and self.layer_builder.input.items.len < 2048) {
+                        // Other bother with the lower level if we have enough items.
+                        break;
+                    }
+
                     var layer = try self.layer_builder.build(allocator);
                     errdefer layer.deinit(allocator);
 
