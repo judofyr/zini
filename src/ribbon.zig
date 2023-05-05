@@ -896,6 +896,43 @@ const RibbonIterativeTest = struct {
     }
 };
 
+const BumpedRibbonTest = struct {
+    const Self = @This();
+
+    allocator: std.mem.Allocator,
+    n: usize,
+
+    r: ?u6 = null,
+    w: ?u6 = null,
+    seed: ?u64 = null,
+
+    builder: ?RibbonU64.BumpedBuilder = null,
+    table: ?RibbonU64.Bumped = null,
+
+    usingnamespace RibbonSettings(Self);
+
+    fn deinit(self: *Self) void {
+        if (self.builder) |*b| b.deinit(self.allocator);
+        if (self.table) |*t| t.deinit(self.allocator);
+    }
+
+    fn init(self: *Self) !void {
+        self.builder = try RibbonU64.BumpedBuilder.init(self.allocator, self.n, 0, self.options());
+    }
+
+    fn insert(self: *Self, key: u64, value: u64) !void {
+        self.builder.?.insert(key, value);
+    }
+
+    fn build(self: *Self) !void {
+        self.table = try self.builder.?.build(self.allocator);
+    }
+
+    fn lookup(self: *Self, key: u64) u64 {
+        return self.table.?.lookup(key);
+    }
+};
+
 fn testRibbonIncremental(allocator: std.mem.Allocator) !void {
     var t = RibbonIncrementalTest{ .allocator = allocator, .n = 100 };
     defer t.deinit();
@@ -908,10 +945,20 @@ fn testRibbonIterative(allocator: std.mem.Allocator) !void {
     try testRibbon(&t);
 }
 
+fn testBumpedRibbon(allocator: std.mem.Allocator) !void {
+    var t = BumpedRibbonTest{ .allocator = allocator, .n = 100 };
+    defer t.deinit();
+    try testRibbon(&t);
+}
+
 test "ribbon incremental" {
     try utils.testFailingAllocator(testRibbonIncremental);
 }
 
 test "ribbon iterative" {
     try utils.testFailingAllocator(testRibbonIterative);
+}
+
+test "bumped ribbon" {
+    try utils.testFailingAllocator(testBumpedRibbon);
 }
