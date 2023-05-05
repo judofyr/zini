@@ -234,7 +234,7 @@ pub fn HashFn(
             var pivots = try allocator.alloc(u64, bucketer.m);
             defer allocator.free(pivots);
 
-            std.mem.set(u64, pivots, 0);
+            @memset(pivots, 0);
 
             for (bucket_summaries.items) |b| {
                 var pivot: u64 = 0;

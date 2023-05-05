@@ -36,8 +36,8 @@ fn fail(comptime msg: []const u8, args: anytype) noreturn {
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer {
-        const leaked = gpa.deinit();
-        if (leaked) @panic("memory leaked");
+        const check = gpa.deinit();
+        if (check == .leak) @panic("memory leaked");
     }
 
     const allocator = gpa.allocator();

@@ -16,7 +16,7 @@ pub fn init(allocator: std.mem.Allocator, width: IntLog2, n: usize) !Self {
     const m = std.math.divCeil(usize, width * n, @bitSizeOf(Int)) catch unreachable;
 
     const data = try allocator.alloc(Int, m);
-    std.mem.set(Int, data, 0);
+    @memset(data, 0);
 
     return Self{
         .data = data,
