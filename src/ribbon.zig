@@ -12,10 +12,12 @@ fn bitParity(num: u64) u64 {
 const RibbonTable = struct {
     const Self = @This();
 
+    n: usize,
     data: CompactArray,
 
     pub fn init(allocator: std.mem.Allocator, r: u6, n: usize) !Self {
         return Self{
+            .n = n,
             .data = try CompactArray.init(allocator, r, n),
         };
     }
@@ -51,27 +53,32 @@ const RibbonTable = struct {
     }
 
     pub fn writeTo(self: *const Self, w: anytype) !void {
+        try w.writeIntNative(u64, self.n);
         try self.data.writeTo(w);
     }
 
     pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
+        var r = stream.reader();
+        var n = try r.readIntNative(u64);
         var data = try CompactArray.readFrom(stream);
-        return Self{ .data = data };
+        return Self{ .n = n, .data = data };
     }
 };
 
 pub const RibbonBandingSystem = struct {
     const Self = @This();
 
+    const Array = CompactArray;
+
     n: usize,
-    c: CompactArray,
-    b: CompactArray,
+    c: Array,
+    b: Array,
 
     pub fn init(allocator: std.mem.Allocator, n: usize, r: u6, w: u6) !Self {
-        var c = try CompactArray.init(allocator, w, n);
+        var c = try Array.init(allocator, w, n);
         errdefer c.deinit(allocator);
 
-        var b = try CompactArray.init(allocator, r, n);
+        var b = try Array.init(allocator, r, n);
         errdefer b.deinit(allocator);
 
         return Self{ .n = n, .c = c, .b = b };
@@ -130,6 +137,11 @@ pub const RibbonBandingSystem = struct {
         }
     }
 
+    pub fn clearRow(self: *Self, i: usize) void {
+        self.c.setToZero(i);
+        self.b.setToZero(i);
+    }
+
     pub fn build(self: Self, allocator: std.mem.Allocator) !RibbonTable {
         const r = self.getValueSize();
 
@@ -138,7 +150,7 @@ pub const RibbonBandingSystem = struct {
 
         var state = try allocator.alloc(u64, r);
         defer allocator.free(state);
-        std.mem.set(u64, state, 0);
+        @memset(state, 0);
 
         // This logic is taken from https://github.com/lorenzhs/BuRR/blob/1c62832ad7d6eab5b337f386955868c3ce9a54ea/backsubst.hpp#L46
         // and I honestly don't quite understand how it works.
@@ -167,10 +179,287 @@ pub const RibbonBandingSystem = struct {
     }
 };
 
+const BumpedLayer = struct {
+    bucket_size: usize,
+    upper_threshold: usize,
+    lower_threshold: usize,
+    thresholds: CompactArray,
+    table: RibbonTable,
+
+    pub fn deinit(self: *BumpedLayer, allocator: std.mem.Allocator) void {
+        self.table.deinit(allocator);
+        self.thresholds.deinit(allocator);
+    }
+
+    pub fn lookup(self: BumpedLayer, i: u64, c: u64) ?u64 {
+        if (self.isBumped(i)) {
+            return null;
+        } else {
+            return self.table.lookup(i, c);
+        }
+    }
+
+    fn isBumped(self: BumpedLayer, i: u64) bool {
+        const bucket_idx = i / self.bucket_size;
+        const bucket_offset = i % self.bucket_size;
+        const threshold = self.thresholds.get(bucket_idx);
+        const threshold_values = [4]usize{ 0, self.lower_threshold, self.upper_threshold, self.bucket_size };
+        return bucket_offset < threshold_values[threshold];
+    }
+
+    pub fn bits(self: BumpedLayer) usize {
+        return self.table.bits() + self.thresholds.bits();
+    }
+
+    pub fn writeTo(self: *const BumpedLayer, w: anytype) !void {
+        try w.writeIntNative(u64, self.bucket_size);
+        try w.writeIntNative(u64, self.upper_threshold);
+        try w.writeIntNative(u64, self.lower_threshold);
+        try self.thresholds.writeTo(w);
+        try self.table.writeTo(w);
+    }
+
+    pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !BumpedLayer {
+        var r = stream.reader();
+        const bucket_size = try r.readIntNative(u64);
+        const upper_threshold = try r.readIntNative(u64);
+        const lower_threshold = try r.readIntNative(u64);
+        const thresholds = try CompactArray.readFrom(stream);
+        const table = try RibbonTable.readFrom(stream);
+
+        return BumpedLayer{
+            .bucket_size = bucket_size,
+            .upper_threshold = upper_threshold,
+            .lower_threshold = lower_threshold,
+            .thresholds = thresholds,
+            .table = table,
+        };
+    }
+};
+
+const BumpedLayerBuilder = struct {
+    const Self = @This();
+
+    const Input = struct {
+        hash1: u64,
+        hash2: u64,
+        hash_result: HashResult,
+        value: u64,
+    };
+
+    m: usize,
+    eps: f64,
+    opts: BuildOptions,
+    input: std.ArrayListUnmanaged(Input),
+
+    fn tableSizeFromEps(n: usize, eps: f64, w: u6) usize {
+        const target = @floatToInt(usize, @intToFloat(f64, n) * (eps + 1));
+        return @max(target, @intCast(usize, w) + 1);
+    }
+
+    pub fn init(allocator: std.mem.Allocator, n: usize, eps: f64, opts: BuildOptions) error{OutOfMemory}!Self {
+        var input = try std.ArrayListUnmanaged(Input).initCapacity(allocator, n);
+
+        return Self{
+            .m = tableSizeFromEps(n, eps, opts.w),
+            .eps = eps,
+            .opts = opts,
+            .input = input,
+        };
+    }
+
+    pub fn deinit(self: *Self, allocator: std.mem.Allocator) void {
+        self.input.deinit(allocator);
+        self.* = undefined;
+    }
+
+    pub fn insert(self: *Self, hash1: u64, hash2: u64, value: u64) void {
+        self.input.appendAssumeCapacity(
+            Input{
+                .hash1 = hash1,
+                .hash2 = hash2,
+                .hash_result = splitHash(hash1, hash2, self.m, self.opts.w),
+                .value = value,
+            },
+        );
+    }
+
+    pub fn build(self: *Self, allocator: std.mem.Allocator) error{ OutOfMemory, HashCollision }!BumpedLayer {
+        const w64 = @as(u64, self.opts.w);
+        const bucket_size = (w64 * w64) / (4 * std.math.log2_int_ceil(u64, w64));
+        const n = self.input.items.len;
+
+        const lessThan = struct {
+            fn lessThan(_: void, left: Input, right: Input) bool {
+                return left.hash_result.i < right.hash_result.i;
+            }
+        }.lessThan;
+
+        std.sort.sort(Input, self.input.items, {}, lessThan);
+
+        var system = try RibbonBandingSystem.init(allocator, self.m, self.opts.r, self.opts.w);
+        defer system.deinit(allocator);
+
+        var inserted = try std.ArrayListUnmanaged(?usize).initCapacity(allocator, bucket_size);
+        defer inserted.deinit(allocator);
+
+        var thresholds = try CompactArray.init(allocator, 2, std.math.divCeil(usize, self.m, bucket_size) catch unreachable);
+        errdefer thresholds.deinit(allocator);
+
+        const lower_threshold = bucket_size / 7;
+        const upper_threshold = bucket_size / 4;
+        std.debug.assert(lower_threshold < upper_threshold);
+        std.debug.assert(upper_threshold < bucket_size);
+
+        const threshold_values = [4]usize{ 0, lower_threshold, upper_threshold, bucket_size };
+
+        const inputs = self.input.items;
+
+        var i: usize = 0;
+        var bucket_start: usize = 0;
+        var bucket_idx: usize = 0;
+        var bump_count: usize = 0;
+
+        while (i < n) {
+            var j = i;
+
+            // Find the end position of this bucket:
+            while (j < n) {
+                if (inputs[j].hash_result.i >= bucket_start + bucket_size) break;
+                j += 1;
+            }
+
+            inserted.clearRetainingCapacity();
+
+            var bump_offset: usize = 0;
+
+            // Now iterate backwards again and insert them:
+            var k: usize = j;
+            while (k > i) {
+                k -= 1;
+                const input = inputs[k];
+                switch (system.insertRow(input.hash_result.i, input.hash_result.c, input.value)) {
+                    .success => |idx| {
+                        try inserted.append(allocator, idx);
+                    },
+                    .redunant => {
+                        try inserted.append(allocator, null);
+                    },
+                    .failure => {
+                        bump_offset = input.hash_result.i - bucket_start + 1;
+                        k += 1;
+                        break;
+                    },
+                }
+            }
+
+            // Next determine the actual threshold to use:
+            var threshold: usize = undefined;
+            for (threshold_values, 0..) |threshold_value, idx| {
+                if (threshold_value >= bump_offset) {
+                    threshold = idx;
+                    break;
+                }
+            }
+
+            const threshold_value = threshold_values[threshold];
+
+            thresholds.setFromZero(bucket_idx, threshold);
+
+            // And now undo all the inserted ones which have an offset outside the threshold:
+            while (k < j) : (k += 1) {
+                const input = inputs[k];
+                if (input.hash_result.i - bucket_start >= threshold_value) break;
+                if (inserted.pop()) |idx| {
+                    system.clearRow(idx);
+                }
+            }
+
+            bump_count += k - i;
+
+            // Prepare for the next bucket:
+            i = j;
+            bucket_start += bucket_size;
+            bucket_idx += 1;
+        }
+
+        var table = try system.build(allocator);
+        errdefer table.deinit(allocator);
+
+        var layer = BumpedLayer{
+            .table = table,
+            .bucket_size = bucket_size,
+            .upper_threshold = upper_threshold,
+            .lower_threshold = lower_threshold,
+            .thresholds = thresholds,
+        };
+
+        // Prepare for the next layer
+
+        self.m = tableSizeFromEps(bump_count, self.eps, self.opts.w);
+
+        var next_inputs = try std.ArrayListUnmanaged(Input).initCapacity(allocator, bump_count);
+        errdefer next_inputs.deinit(allocator);
+
+        for (inputs) |input| {
+            if (layer.isBumped(input.hash_result.i)) {
+                next_inputs.appendAssumeCapacity(Input{
+                    .hash1 = input.hash1,
+                    .hash2 = input.hash2,
+                    .hash_result = splitHash(input.hash1, input.hash2, self.m, self.opts.w),
+                    .value = input.value,
+                });
+            }
+        }
+
+        std.debug.assert(next_inputs.items.len == bump_count);
+
+        self.input.deinit(allocator);
+        self.input = next_inputs;
+
+        return layer;
+    }
+
+    pub fn buildFallbackTable(self: *BumpedLayerBuilder, allocator: std.mem.Allocator) !RibbonTable {
+        const n = self.input.items.len;
+        const step = @max(n / 10, 1);
+        var m: usize = @max(n, @intCast(usize, self.opts.w) + 1);
+
+        var i: usize = 0;
+        loop: while (i < 50) : (i += 1) {
+            var system = try RibbonBandingSystem.init(allocator, m, self.opts.r, self.opts.w);
+            defer system.deinit(allocator);
+
+            for (self.input.items) |input| {
+                const h = splitHash(input.hash1, input.hash2, m, self.opts.w);
+                const insert_result = system.insertRow(h.i, h.c, input.value);
+                switch (insert_result) {
+                    .failure => {
+                        m += step;
+                        continue :loop;
+                    },
+                    else => {},
+                }
+            }
+
+            return try system.build(allocator);
+        }
+
+        return error.HashCollision;
+    }
+};
+
 const HashResult = struct {
     i: u64,
     c: u64,
 };
+
+fn splitHash(hash1: u64, hash2: u64, n: usize, w: u6) HashResult {
+    var i = hash1 % (n - w);
+    const c_mask = ((@as(u64, 1) << w) - 1);
+    var c = (hash2 & c_mask) | 1;
+    return .{ .i = i, .c = c };
+}
 
 const BuildOptions = struct {
     r: u6,
@@ -189,14 +478,6 @@ pub fn Ribbon(
             return splitHash(hasher(seed, key), hasher(seed + 1, key), n, w);
         }
 
-        fn splitHash(hash1: u64, hash2: u64, n: usize, w: u6) HashResult {
-            var i = hash1 % (n - w);
-            const c_mask = ((@as(u64, 1) << w) - 1);
-            var c = (hash2 & c_mask) | 1;
-            return .{ .i = i, .c = c };
-        }
-
-        n: usize,
         w: u6,
         seed: u64,
         table: RibbonTable,
@@ -207,7 +488,7 @@ pub fn Ribbon(
         }
 
         pub fn lookup(self: *const Self, key: Key) u64 {
-            const h = hashKey(self.seed, key, self.n, self.w);
+            const h = hashKey(self.seed, key, self.table.n, self.w);
             return self.table.lookup(h.i, h.c);
         }
 
@@ -216,7 +497,6 @@ pub fn Ribbon(
         }
 
         pub fn writeTo(self: *const Self, w: anytype) !void {
-            try w.writeIntNative(u64, self.n);
             try w.writeIntNative(u64, self.w);
             try w.writeIntNative(u64, self.seed);
             try self.table.writeTo(w);
@@ -224,12 +504,10 @@ pub fn Ribbon(
 
         pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
             var r = stream.reader();
-            const n = try r.readIntNative(u64);
             const w = try r.readIntNative(u64);
             const seed = try r.readIntNative(u64);
             const table = try RibbonTable.readFrom(stream);
             return Self{
-                .n = n,
                 .w = @intCast(u6, w),
                 .seed = seed,
                 .table = table,
@@ -271,7 +549,6 @@ pub fn Ribbon(
                 var table = try self.system.build(allocator);
 
                 return Self{
-                    .n = self.n,
                     .w = self.system.getBandWidth(),
                     .seed = self.seed,
                     .table = table,
@@ -353,7 +630,6 @@ pub fn Ribbon(
                     var table = try system.build(allocator);
 
                     return Self{
-                        .n = m,
                         .w = opts.w,
                         .seed = opts.seed,
                         .table = table,
@@ -361,6 +637,120 @@ pub fn Ribbon(
                 }
 
                 return error.HashCollision;
+            }
+        };
+
+        pub const Bumped = struct {
+            const Layers = std.BoundedArray(BumpedLayer, 4);
+
+            w: u6,
+            seed: u64,
+            layers: Layers,
+            fallback_table: RibbonTable,
+
+            pub fn deinit(self: *Bumped, allocator: std.mem.Allocator) void {
+                for (self.layers.slice()) |*layer| {
+                    layer.deinit(allocator);
+                }
+                self.fallback_table.deinit(allocator);
+                self.* = undefined;
+            }
+
+            pub fn lookup(self: *const Bumped, key: Key) u64 {
+                const hash1 = hasher(self.seed, key);
+                const hash2 = hasher(self.seed + 1, key);
+                for (self.layers.slice()) |layer| {
+                    const h = splitHash(hash1, hash2, layer.table.n, self.w);
+                    if (layer.lookup(h.i, h.c)) |result| {
+                        return result;
+                    }
+                }
+                const h = splitHash(hash1, hash2, self.fallback_table.n, self.w);
+                return self.fallback_table.lookup(h.i, h.c);
+            }
+
+            pub fn bits(self: Bumped) usize {
+                var result = self.fallback_table.bits();
+                for (self.layers.slice()) |layer| {
+                    result += layer.bits();
+                }
+                return result;
+            }
+
+            pub fn writeTo(self: *const Bumped, w: anytype) !void {
+                try w.writeIntNative(u64, self.w);
+                try w.writeIntNative(u64, self.seed);
+                try w.writeIntNative(u64, self.layers.len);
+                for (self.layers.slice()) |layer| {
+                    try layer.writeTo(w);
+                }
+                try self.fallback_table.writeTo(w);
+            }
+
+            pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Bumped {
+                var r = stream.reader();
+                const w = try r.readIntNative(u64);
+                const seed = try r.readIntNative(u64);
+                const layers_len = try r.readIntNative(u64);
+                var layers = Layers.init(0) catch unreachable;
+                for (0..layers_len) |_| {
+                    layers.appendAssumeCapacity(try BumpedLayer.readFrom(stream));
+                }
+                const fallback_table = try RibbonTable.readFrom(stream);
+                return Bumped{
+                    .w = @intCast(u6, w),
+                    .seed = seed,
+                    .layers = layers,
+                    .fallback_table = fallback_table,
+                };
+            }
+        };
+
+        pub const BumpedBuilder = struct {
+            layer_builder: BumpedLayerBuilder,
+
+            pub fn init(allocator: std.mem.Allocator, n: usize, eps: f64, opts: BuildOptions) error{OutOfMemory}!BumpedBuilder {
+                var layer_builder = try BumpedLayerBuilder.init(allocator, n, eps, opts);
+                errdefer layer_builder.deinit(allocator);
+
+                return BumpedBuilder{ .layer_builder = layer_builder };
+            }
+
+            pub fn deinit(self: *BumpedBuilder, allocator: std.mem.Allocator) void {
+                self.layer_builder.deinit(allocator);
+                self.* = undefined;
+            }
+
+            pub fn insert(self: *BumpedBuilder, key: Key, value: u64) void {
+                const hash1 = hasher(self.layer_builder.opts.seed, key);
+                const hash2 = hasher(self.layer_builder.opts.seed + 1, key);
+                self.layer_builder.insert(hash1, hash2, value);
+            }
+
+            pub fn build(self: *BumpedBuilder, allocator: std.mem.Allocator) error{ OutOfMemory, HashCollision }!Bumped {
+                var layers = Bumped.Layers.init(0) catch unreachable;
+                errdefer {
+                    for (layers.slice()) |*layer| {
+                        layer.deinit(allocator);
+                    }
+                }
+
+                while (layers.len < layers.capacity() and self.layer_builder.input.items.len >= 2048) {
+                    var layer = try self.layer_builder.build(allocator);
+                    errdefer layer.deinit(allocator);
+
+                    layers.appendAssumeCapacity(layer);
+                }
+
+                var fallback_table = try self.layer_builder.buildFallbackTable(allocator);
+                errdefer fallback_table.deinit(allocator);
+
+                return Bumped{
+                    .w = self.layer_builder.opts.w,
+                    .seed = self.layer_builder.opts.seed,
+                    .layers = layers,
+                    .fallback_table = fallback_table,
+                };
             }
         };
     };

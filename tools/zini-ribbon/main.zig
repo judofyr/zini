@@ -68,8 +68,8 @@ pub fn main() !void {
     std.debug.print(usage, .{program_name});
 }
 
-fn printStats(table: HashRibbon, dict: StringDict, n: usize) !void {
-    const bits = table.bits() + @bitSizeOf(HashRibbon) + dict.bits() + @bitSizeOf(StringDict);
+fn printStats(table: anytype, n: usize) !void {
+    const bits = table.bits() + @bitSizeOf(@TypeOf(table));
     std.debug.print("  seed: {}\n", .{table.seed});
     std.debug.print("  bits: {}\n", .{bits});
     std.debug.print("  bits/n: {d}\n", .{@intToFloat(f64, bits) / @intToFloat(f64, n)});
@@ -80,6 +80,7 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
     var input: ?[]const u8 = null;
     var output: ?[]const u8 = null;
     var seed: ?u64 = null;
+    var eps: f64 = 0;
 
     while (p.next()) |token| {
         switch (token) {
@@ -96,6 +97,9 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
                 } else if (flag.isShort("w")) {
                     const val = p.nextValue() orelse @panic("value required");
                     w = @intCast(u6, try std.fmt.parseInt(usize, val, 10));
+                } else if (flag.isLong("eps")) {
+                    const val = p.nextValue() orelse @panic("value required");
+                    eps = try std.fmt.parseFloat(f64, val);
                 } else {
                     fail("uknown flag: {s}", .{flag.name});
                 }
@@ -123,41 +127,46 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
         try std.os.getrandom(std.mem.asBytes(&seed));
     }
 
-    var builder = try HashRibbon.IterativeBuilder.init(allocator, 32, seed.?);
-    defer builder.deinit(allocator);
-
-    var value_dict_builder = try StringDict.Builder.init(allocator);
-    defer value_dict_builder.deinit();
-
     var max_val: u64 = 0;
     var n: usize = 0;
 
     var iter = std.mem.tokenize(u8, data, "\n");
     while (iter.next()) |line| {
-        var split = std.mem.split(u8, line, " ");
-        var key = split.next().?;
-        var value = split.next().?;
-        const val_idx = try value_dict_builder.intern(value);
-        max_val = @max(val_idx, max_val);
-        try builder.insertWithAllocator(allocator, key, val_idx);
+        var split = std.mem.split(u8, line, ",");
+        _ = split.next().?; // the key
+        var value = try std.fmt.parseInt(u64, split.next().?, 10);
+        max_val = @max(max_val, value);
         n += 1;
     }
 
+    const r = @intCast(u6, std.math.log2_int_ceil(u64, max_val + 1));
+
     std.debug.print("\n", .{});
-    std.debug.print("Building table...\n", .{});
-    var table = try builder.build(allocator, .{
-        .r = @intCast(u6, std.math.log2_int_ceil(u64, max_val + 1)),
+    std.debug.print("Building table for r={} value bits and eps={}...\n", .{ r, eps });
+
+    const opts = .{
+        .r = r,
         .w = w,
         .seed = seed.?,
-    });
-    defer table.deinit(allocator);
+    };
 
-    var value_dict = try value_dict_builder.build();
-    defer value_dict.deinit(allocator);
+    var builder = try HashRibbon.BumpedBuilder.init(allocator, n, eps, opts);
+    defer builder.deinit(allocator);
+
+    iter = std.mem.tokenize(u8, data, "\n");
+    while (iter.next()) |line| {
+        var split = std.mem.split(u8, line, ",");
+        var key = split.next().?; // the key
+        var value = try std.fmt.parseInt(u64, split.next().?, 10);
+        builder.insert(key, value);
+    }
+
+    var table = try builder.build(allocator);
+    defer table.deinit(allocator);
 
     std.debug.print("\n", .{});
     std.debug.print("Successfully built table:\n", .{});
-    try printStats(table, value_dict, n);
+    try printStats(table, n);
 
     if (output) |o| {
         std.debug.print("\n", .{});
@@ -167,7 +176,6 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
 
         try outfile.writer().writeIntNative(u64, n);
         try table.writeTo(outfile.writer());
-        try value_dict.writeTo(outfile.writer());
     }
 }
 
@@ -208,18 +216,17 @@ pub fn lookup(allocator: std.mem.Allocator, p: anytype) !void {
 
     var fbs = std.io.fixedBufferStream(@as([]const u8, buf));
     var n = try fbs.reader().readIntNative(u64);
-    var table = try HashRibbon.readFrom(&fbs);
-    var dict = try StringDict.readFrom(&fbs);
+    var table = try HashRibbon.Bumped.readFrom(&fbs);
     std.debug.print("\n", .{});
 
     std.debug.print("Successfully loaded hash function:\n", .{});
-    try printStats(table, dict, n);
+    try printStats(table, n);
     std.debug.print("\n", .{});
 
     if (key) |k| {
         std.debug.print("Looking up key={s}:\n", .{k});
-        var idx = table.lookup(k);
-        try stdout.print("index={} value={s}\n", .{ idx, dict.get(idx) });
+        var value = table.lookup(k);
+        try stdout.print("{}\n", .{value});
 
         if (bench) {
             const m = 1000;
@@ -229,7 +236,7 @@ pub fn lookup(allocator: std.mem.Allocator, p: anytype) !void {
             var i: usize = 0;
             // TODO: Is this actually a good way of benchmarking?
             while (i < m) : (i += 1) {
-                std.mem.doNotOptimizeAway(dict.get(table.lookup(k)));
+                std.mem.doNotOptimizeAway(table.lookup(k));
             }
             const end = timer.read();
             const dur = end - start;
