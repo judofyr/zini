@@ -170,9 +170,9 @@ pub fn DArray(comptime val: bool) type {
             var subblock_inventory = try utils.readSlice(stream, u16);
             var overflow_positions = try utils.readSlice(stream, u64);
             return Self{
-                .block_inventory = block_inventory,
-                .subblock_inventory = subblock_inventory,
-                .overflow_positions = overflow_positions,
+                .block_inventory = @constCast(block_inventory),
+                .subblock_inventory = @constCast(subblock_inventory),
+                .overflow_positions = @constCast(overflow_positions),
             };
         }
     };
