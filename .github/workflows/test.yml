@@ -14,5 +14,7 @@ jobs:
           version: master
       - name: Formatting
         run: zig fmt --check src/*.zig
+      - name: Build executables
+        run: zig build
       - name: Tests
         run: zig build test
