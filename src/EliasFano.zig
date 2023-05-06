@@ -31,7 +31,7 @@ pub fn encode(allocator: std.mem.Allocator, data: []const u64) !Self {
     // We need to store `2^h-1` zeroes and `n` ones.
     var high_bits = try DynamicBitSetUnmanaged.initEmpty(allocator, (@as(u64, 1) << h) - 1 + n);
 
-    var low_bits = try CompactArray.init(allocator, l, data.len);
+    var low_bits = try CompactArray.Mutable.init(allocator, l, data.len);
 
     for (data, 0..) |num, idx| {
         if (l > 0) {
@@ -43,7 +43,7 @@ pub fn encode(allocator: std.mem.Allocator, data: []const u64) !Self {
     return Self{
         .high_bits = high_bits,
         .high_bits_select = try DArray1.init(allocator, high_bits),
-        .low_bits = low_bits,
+        .low_bits = low_bits.finalize(),
     };
 }
 

@@ -15,10 +15,10 @@ const RibbonTable = struct {
     n: usize,
     data: CompactArray,
 
-    pub fn init(allocator: std.mem.Allocator, r: u6, n: usize) !Self {
+    pub fn init(n: usize, data: CompactArray) Self {
         return Self{
             .n = n,
-            .data = try CompactArray.init(allocator, r, n),
+            .data = data,
         };
     }
 
@@ -68,7 +68,7 @@ const RibbonTable = struct {
 pub const RibbonBandingSystem = struct {
     const Self = @This();
 
-    const Array = CompactArray;
+    const Array = CompactArray.Mutable;
 
     n: usize,
     c: Array,
@@ -145,8 +145,8 @@ pub const RibbonBandingSystem = struct {
     pub fn build(self: Self, allocator: std.mem.Allocator) !RibbonTable {
         const r = self.getValueSize();
 
-        var table = try RibbonTable.init(allocator, r, self.n);
-        errdefer table.deinit(allocator);
+        var data = try CompactArray.Mutable.init(allocator, r, self.n);
+        errdefer data.deinit(allocator);
 
         var state = try allocator.alloc(u64, r);
         defer allocator.free(state);
@@ -172,10 +172,10 @@ pub const RibbonBandingSystem = struct {
                 resultRow |= (bit << j);
             }
 
-            table.data.setFromZero(i, resultRow);
+            data.setFromZero(i, resultRow);
         }
 
-        return table;
+        return RibbonTable.init(self.n, data.finalize());
     }
 };
 
@@ -303,7 +303,7 @@ const BumpedLayerBuilder = struct {
         var inserted = try std.ArrayListUnmanaged(?usize).initCapacity(allocator, bucket_size);
         defer inserted.deinit(allocator);
 
-        var thresholds = try CompactArray.init(allocator, 2, std.math.divCeil(usize, self.m, bucket_size) catch unreachable);
+        var thresholds = try CompactArray.Mutable.init(allocator, 2, std.math.divCeil(usize, self.m, bucket_size) catch unreachable);
         errdefer thresholds.deinit(allocator);
 
         const lower_threshold = bucket_size / 7;
@@ -386,20 +386,20 @@ const BumpedLayerBuilder = struct {
         var table = try system.build(allocator);
         errdefer table.deinit(allocator);
 
+        // Prepare for the next layer
+
+        var next_inputs = try std.ArrayListUnmanaged(Input).initCapacity(allocator, bump_count);
+        errdefer next_inputs.deinit(allocator);
+
         var layer = BumpedLayer{
             .table = table,
             .bucket_size = bucket_size,
             .upper_threshold = upper_threshold,
             .lower_threshold = lower_threshold,
-            .thresholds = thresholds,
+            .thresholds = thresholds.finalize(),
         };
 
-        // Prepare for the next layer
-
         self.m = tableSizeFromEps(bump_count, self.eps, self.opts.w);
-
-        var next_inputs = try std.ArrayListUnmanaged(Input).initCapacity(allocator, bump_count);
-        errdefer next_inputs.deinit(allocator);
 
         for (inputs) |input| {
             if (layer.isBumped(input.hash_result.i)) {

@@ -8,21 +8,8 @@ const Self = @This();
 const Int = u64;
 const IntLog2 = std.math.Log2Int(Int);
 
-data: []Int,
+data: []const Int,
 width: IntLog2,
-
-/// Creates a new array that can store `n` values of `width` bits each.
-pub fn init(allocator: std.mem.Allocator, width: IntLog2, n: usize) !Self {
-    const m = std.math.divCeil(usize, width * n, @bitSizeOf(Int)) catch unreachable;
-
-    const data = try allocator.alloc(Int, m);
-    @memset(data, 0);
-
-    return Self{
-        .data = data,
-        .width = width,
-    };
-}
 
 pub fn deinit(self: *Self, allocator: std.mem.Allocator) void {
     allocator.free(self.data);
@@ -51,71 +38,16 @@ pub fn get(self: *const Self, idx: usize) u64 {
     }
 }
 
-/// Sets a value at a given index with the assumption that the existing value was already zero.
-pub fn setFromZero(self: *const Self, idx: usize, val: u64) void {
-    const pos = idx * self.width;
-    const block = pos / @bitSizeOf(Int);
-    const shift = @intCast(IntLog2, pos % @bitSizeOf(Int));
-
-    self.data[block] |= val << shift;
-
-    if (shift > 0) {
-        const res_shift = ~shift + 1; //  =:=  @bitSizeOf(Int) - shift;
-        if (res_shift < self.width) {
-            self.data[block + 1] |= val >> res_shift;
-        }
-    }
-}
-
-/// Sets a value at a given index to zero.
-pub fn setToZero(self: *const Self, idx: usize) void {
-    const pos = idx * self.width;
-    const block = pos / @bitSizeOf(Int);
-    const shift = @intCast(IntLog2, pos % @bitSizeOf(Int));
-
-    // This is easier to understand with an example:
-    //   block size=8 (this is actually 64 in our implementation)
-    //   width=5
-    //   shift=6
-    //
-    // Let "V" be a value bit and "P" a "padding bit" (other value).
-    //
-    // Block 1: VV PPPPPP
-    // Block 2: PPPPP VVV
-
-    // There's also the case where it _doesn't_ cross a block:
-    //   shift=2
-    //   Block 1: PP VVVVV PP
-
-    // Here we need to make sure we don't zero out those upper paddings.
-    const upper_mask = ~@as(Int, 0) << self.width << shift;
-    const lower_mask = ((@as(Int, 1) << shift) - 1);
-
-    // Clear out VV by AND-ing 00111111;
-    self.data[block] &= lower_mask | upper_mask;
-
-    if (shift > 0) {
-        const res_shift = ~shift + 1; //  =:=  @bitSizeOf(Int) - shift;
-
-        if (res_shift < self.width) {
-            // res_shift in this example is 2 and thus width-res_shift = 3.
-            // We then build the mask 11111000 by NOT-ing 00000111.
-
-            self.data[block + 1] &= ~((@as(Int, 1) << (self.width - res_shift)) - 1);
-        }
-    }
-}
-
 /// Encodes an array into the smallest compact array possible.
 pub fn encode(allocator: std.mem.Allocator, data: []const u64) !Self {
     if (data.len == 0) return Self{ .data = &[_]Int{}, .width = 1 };
 
     const width = @intCast(IntLog2, std.math.log2_int(u64, std.mem.max(u64, data)) + 1);
-    var arr = try init(allocator, width, data.len);
+    var arr = try Mutable.init(allocator, width, data.len);
     for (data, 0..) |val, idx| {
         arr.setFromZero(idx, val);
     }
-    return arr;
+    return arr.finalize();
 }
 
 /// Writes the array into an std.io.Writer. This can be read using `readFrom`.
@@ -137,6 +69,101 @@ pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
     };
 }
 
+pub const Mutable = struct {
+    data: []Int,
+    width: IntLog2,
+
+    /// Creates a new array that can store `n` values of `width` bits each.
+    pub fn init(allocator: std.mem.Allocator, width: IntLog2, n: usize) !Mutable {
+        const m = std.math.divCeil(usize, width * n, @bitSizeOf(Int)) catch unreachable;
+
+        const data = try allocator.alloc(Int, m);
+        @memset(data, 0);
+
+        return Mutable{
+            .data = data,
+            .width = width,
+        };
+    }
+
+    pub fn deinit(self: *Mutable, allocator: std.mem.Allocator) void {
+        allocator.free(self.data);
+        self.* = undefined;
+    }
+
+    pub fn finalize(self: *Mutable) Self {
+        const result = self.asImmutable();
+        self.* = undefined;
+        return result;
+    }
+
+    pub fn asImmutable(self: Mutable) Self {
+        return Self{
+            .data = self.data,
+            .width = self.width,
+        };
+    }
+
+    pub fn get(self: Mutable, idx: usize) u64 {
+        return self.asImmutable().get(idx);
+    }
+
+    /// Sets a value at a given index with the assumption that the existing value was already zero.
+    pub fn setFromZero(self: Mutable, idx: usize, val: u64) void {
+        const pos = idx * self.width;
+        const block = pos / @bitSizeOf(Int);
+        const shift = @intCast(IntLog2, pos % @bitSizeOf(Int));
+
+        self.data[block] |= val << shift;
+
+        if (shift > 0) {
+            const res_shift = ~shift + 1; //  =:=  @bitSizeOf(Int) - shift;
+            if (res_shift < self.width) {
+                self.data[block + 1] |= val >> res_shift;
+            }
+        }
+    }
+
+    /// Sets a value at a given index to zero.
+    pub fn setToZero(self: Mutable, idx: usize) void {
+        const pos = idx * self.width;
+        const block = pos / @bitSizeOf(Int);
+        const shift = @intCast(IntLog2, pos % @bitSizeOf(Int));
+
+        // This is easier to understand with an example:
+        //   block size=8 (this is actually 64 in our implementation)
+        //   width=5
+        //   shift=6
+        //
+        // Let "V" be a value bit and "P" a "padding bit" (other value).
+        //
+        // Block 1: VV PPPPPP
+        // Block 2: PPPPP VVV
+
+        // There's also the case where it _doesn't_ cross a block:
+        //   shift=2
+        //   Block 1: PP VVVVV PP
+
+        // Here we need to make sure we don't zero out those upper paddings.
+        const upper_mask = ~@as(Int, 0) << self.width << shift;
+        const lower_mask = ((@as(Int, 1) << shift) - 1);
+
+        // Clear out VV by AND-ing 00111111;
+        self.data[block] &= lower_mask | upper_mask;
+
+        if (shift > 0) {
+            const res_shift = ~shift + 1; //  =:=  @bitSizeOf(Int) - shift;
+
+            if (res_shift < self.width) {
+                // res_shift in this example is 2 and thus width-res_shift = 3.
+                // We then build the mask 11111000 by NOT-ing 00000111.
+
+                self.data[block + 1] &= ~((@as(Int, 1) << (self.width - res_shift)) - 1);
+            }
+        }
+    }
+};
+
 const testing = std.testing;
 
 test "basic" {
@@ -144,7 +171,7 @@ test "basic" {
     const width = 5;
     const max_val = 30;
 
-    var c = try Self.init(testing.allocator, width, n);
+    var c = try Self.Mutable.init(testing.allocator, width, n);
     defer c.deinit(testing.allocator);
 
     var i: usize = 0;
