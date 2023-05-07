@@ -6,15 +6,29 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
-          submodules: true
+          path: zini
+
       - uses: goto-bus-stop/setup-zig@v1
         with:
           version: master
+
       - name: Formatting
         run: zig fmt --check src/*.zig
-      - name: Build executables
-        run: zig build
+        working-directory: zini
+
       - name: Tests
         run: zig build test
+        working-directory: zini
+
+      ## Now try to build the executables:
+      - name: Checkout parg
+        uses: actions/checkout@v3
+        with:
+          repository: judofyr/parg
+          path: parg
+
+      - name: Build executables
+        run: zig build
+        working-directory: zini
