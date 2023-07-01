@@ -73,21 +73,21 @@ fn printHashStats(hash: HashFn, dict: ?StringDict, arr: ?zini.DictArray) !void {
     const bits = hash.bits() + @bitSizeOf(HashFn);
     std.debug.print("  seed: {}\n", .{hash.seed});
     std.debug.print("  bits: {}\n", .{bits});
-    std.debug.print("  bits/n: {d}\n", .{@intToFloat(f64, bits) / @intToFloat(f64, hash.n)});
+    std.debug.print("  bits/n: {d}\n", .{@as(f64, @floatFromInt(bits)) / @as(f64, @floatFromInt(hash.n))});
     std.debug.print("\n", .{});
 
     if (dict != null) {
         const dict_size = dict.?.bits() + @bitSizeOf(StringDict) + arr.?.bits() + @bitSizeOf(zini.DictArray);
         std.debug.print("File contains dictionary as well:\n", .{});
         std.debug.print("  bits: {}\n", .{dict_size});
-        std.debug.print("  bits/n: {d}\n", .{@intToFloat(f64, dict_size) / @intToFloat(f64, hash.n)});
+        std.debug.print("  bits/n: {d}\n", .{@as(f64, @floatFromInt(dict_size)) / @as(f64, @floatFromInt(hash.n))});
         std.debug.print("\n", .{});
 
         const total_bits = bits + dict_size;
 
         std.debug.print("Combined:\n", .{});
         std.debug.print("  bits: {}\n", .{total_bits});
-        std.debug.print("  bits/n: {d}\n", .{@intToFloat(f64, total_bits) / @intToFloat(f64, hash.n)});
+        std.debug.print("  bits/n: {d}\n", .{@as(f64, @floatFromInt(total_bits)) / @as(f64, @floatFromInt(hash.n))});
         std.debug.print("\n", .{});
     }
 }

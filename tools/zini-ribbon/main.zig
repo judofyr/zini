@@ -72,7 +72,7 @@ fn printStats(table: anytype, n: usize) !void {
     const bits = table.bits() + @bitSizeOf(@TypeOf(table));
     std.debug.print("  seed: {}\n", .{table.seed});
     std.debug.print("  bits: {}\n", .{bits});
-    std.debug.print("  bits/n: {d}\n", .{@intToFloat(f64, bits) / @intToFloat(f64, n)});
+    std.debug.print("  bits/n: {d}\n", .{@as(f64, @floatFromInt(bits)) / @as(f64, @floatFromInt(n))});
 }
 
 pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
