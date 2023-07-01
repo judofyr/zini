@@ -22,8 +22,8 @@ const Bucketer = struct {
     /// Creates a new bucketer for `n` items with a given `c` parameter.
     pub fn init(n: usize, c: usize) Bucketer {
         const m = c * n / (std.math.log2_int(usize, n) + 1);
-        const p1 = @floatToInt(usize, 0.6 * @intToFloat(f64, n));
-        const p2 = @floatToInt(usize, 0.3 * @intToFloat(f64, m));
+        const p1: usize = @intFromFloat(0.6 * @as(f64, @floatFromInt(n)));
+        const p2: usize = @intFromFloat(0.3 * @as(f64, @floatFromInt(m)));
 
         return Bucketer{
             .n = n,
@@ -182,7 +182,7 @@ pub fn HashFn(
             seed: u64,
         ) !Self {
             std.debug.assert(params.alpha <= 1);
-            const n_prime = @floatToInt(usize, @intToFloat(f64, keys.len) / params.alpha);
+            const n_prime: usize = @intFromFloat(@as(f64, @floatFromInt(keys.len)) / params.alpha);
             const bucketer = Bucketer.init(n_prime, params.c);
 
             // Step 1: Hash all the inputs and figure out which bucket they belong to.
@@ -196,7 +196,7 @@ pub fn HashFn(
                 entries[idx] = HashedKey{ .hash = hash, .bucket = bucket };
             }
 
-            std.sort.sort(HashedKey, entries, {}, HashedKey.lessThan);
+            std.mem.sort(HashedKey, entries, {}, HashedKey.lessThan);
 
             // Step 2: Group the entries into buckets ordered by size.
 
@@ -221,7 +221,7 @@ pub fn HashFn(
                 }
             }
 
-            std.sort.sort(BucketSummary, bucket_summaries.items, {}, BucketSummary.lessThan);
+            std.mem.sort(BucketSummary, bucket_summaries.items, {}, BucketSummary.lessThan);
 
             // Step 3: Determine pivots
 

@@ -45,7 +45,7 @@ pub fn DArray(comptime val: bool) type {
 
             var iter = bit_set.iterator(.{ .kind = if (val) .set else .unset });
             while (iter.next()) |pos| {
-                cur_block_positions.appendAssumeCapacity(@intCast(u63, pos));
+                cur_block_positions.appendAssumeCapacity(@intCast(pos));
                 if (cur_block_positions.items.len == block_size) {
                     try flushCurBlock(allocator, &cur_block_positions, &block_inventory, &subblock_inventory, &overflow_positions);
                 }
@@ -84,11 +84,11 @@ pub fn DArray(comptime val: bool) type {
                 try block_inventory.append(allocator, BlockPosition{ .is_overflow = false, .pos = fst });
                 var i: usize = 0;
                 while (i < cur_block_positions.items.len) : (i += subblock_size) {
-                    try subblock_inventory.append(allocator, @intCast(u16, cur_block_positions.items[i] - fst));
+                    try subblock_inventory.append(allocator, @intCast(cur_block_positions.items[i] - fst));
                 }
             } else {
                 var overflow_pos = overflow_positions.items.len;
-                try block_inventory.append(allocator, BlockPosition{ .is_overflow = true, .pos = @intCast(u63, overflow_pos) });
+                try block_inventory.append(allocator, BlockPosition{ .is_overflow = true, .pos = @intCast(overflow_pos) });
                 for (cur_block_positions.items) |pos| {
                     try overflow_positions.append(allocator, pos);
                 }
@@ -124,10 +124,10 @@ pub fn DArray(comptime val: bool) type {
 
             // Note: These assume the BitSet uses u64.
             var word_idx = start_pos >> 6;
-            const word_shift = @intCast(u6, start_pos & 63);
+            const word_shift: u6 = @intCast(start_pos & 63);
 
             var word = readWord(bit_set, word_idx);
-            word &= @bitCast(u64, @as(i64, -1)) << word_shift;
+            word &= @as(u64, @bitCast(@as(i64, -1))) << word_shift;
 
             while (true) {
                 var popcount = @popCount(word);

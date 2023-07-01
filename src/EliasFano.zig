@@ -23,7 +23,7 @@ pub fn encode(allocator: std.mem.Allocator, data: []const u64) !Self {
     const n = data.len;
     const u = data[data.len - 1];
 
-    const num_bits = @intCast(u6, std.math.log2_int(u64, u) + 1);
+    const num_bits: u6 = @intCast(std.math.log2_int(u64, u) + 1);
     const l = if (u > data.len) std.math.log2_int(u64, u / data.len) + 1 else 0;
     const l_mask = (@as(u64, 1) << l) - 1;
     const h = num_bits - l;

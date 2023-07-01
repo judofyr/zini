@@ -54,7 +54,7 @@ pub const Builder = struct {
         var result = try self.dict_positions.getOrPut(key);
         if (!result.found_existing) {
             result.value_ptr.* = self.dict_values.items.len;
-            try self.dict_values.append(@intCast(u8, key.len));
+            try self.dict_values.append(@intCast(key.len));
             for (key) |byte| {
                 try self.dict_values.append(byte);
             }

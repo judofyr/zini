@@ -96,7 +96,7 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
                     seed = try std.fmt.parseInt(usize, val, 10);
                 } else if (flag.isShort("w")) {
                     const val = p.nextValue() orelse @panic("value required");
-                    w = @intCast(u6, try std.fmt.parseInt(usize, val, 10));
+                    w = @intCast(try std.fmt.parseInt(usize, val, 10));
                 } else if (flag.isLong("eps")) {
                     const val = p.nextValue() orelse @panic("value required");
                     eps = try std.fmt.parseFloat(f64, val);
@@ -139,7 +139,7 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
         n += 1;
     }
 
-    const r = @intCast(u6, std.math.log2_int_ceil(u64, max_val + 1));
+    const r: u6 = @intCast(std.math.log2_int_ceil(u64, max_val + 1));
 
     std.debug.print("\n", .{});
     std.debug.print("Building table for r={} value bits and eps={}...\n", .{ r, eps });

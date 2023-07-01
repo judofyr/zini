@@ -28,7 +28,7 @@ fn getMask(self: *const Self) u64 {
 pub fn get(self: *const Self, idx: usize) u64 {
     const pos = idx * self.width;
     const block = pos / @bitSizeOf(Int);
-    const shift = @intCast(IntLog2, pos % @bitSizeOf(Int));
+    const shift: IntLog2 = @intCast(pos % @bitSizeOf(Int));
 
     if (@as(Int, shift) + self.width <= @bitSizeOf(Int)) {
         return (self.data[block] >> shift) & self.getMask();
@@ -42,7 +42,7 @@ pub fn get(self: *const Self, idx: usize) u64 {
 pub fn encode(allocator: std.mem.Allocator, data: []const u64) !Self {
     if (data.len == 0) return Self{ .data = &[_]Int{}, .width = 1 };
 
-    const width = @intCast(IntLog2, std.math.log2_int(u64, std.mem.max(u64, data)) + 1);
+    const width: IntLog2 = @intCast(std.math.log2_int(u64, std.mem.max(u64, data)) + 1);
     var arr = try Mutable.init(allocator, width, data.len);
     for (data, 0..) |val, idx| {
         arr.setFromZero(idx, val);
@@ -64,7 +64,7 @@ pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
     var width = try r.readIntNative(Int);
     var data = try utils.readSlice(stream, Int);
     return Self{
-        .width = @intCast(IntLog2, width),
+        .width = @intCast(width),
         .data = data,
     };
 }
@@ -112,7 +112,7 @@ pub const Mutable = struct {
     pub fn setFromZero(self: Mutable, idx: usize, val: u64) void {
         const pos = idx * self.width;
         const block = pos / @bitSizeOf(Int);
-        const shift = @intCast(IntLog2, pos % @bitSizeOf(Int));
+        const shift: IntLog2 = @intCast(pos % @bitSizeOf(Int));
 
         self.data[block] |= val << shift;
 
@@ -128,7 +128,7 @@ pub const Mutable = struct {
     pub fn setToZero(self: Mutable, idx: usize) void {
         const pos = idx * self.width;
         const block = pos / @bitSizeOf(Int);
-        const shift = @intCast(IntLog2, pos % @bitSizeOf(Int));
+        const shift: IntLog2 = @intCast(pos % @bitSizeOf(Int));
 
         // This is easier to understand with an example:
         //   block size=8 (this is actually 64 in our implementation)

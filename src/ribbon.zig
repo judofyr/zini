@@ -41,7 +41,7 @@ const RibbonTable = struct {
             i_ += 1;
             if (c_ == 0) break;
 
-            const j = @intCast(u6, @ctz(c_));
+            const j: u6 = @intCast(@ctz(c_));
             i_ += j;
             c_ >>= j;
         }
@@ -131,7 +131,7 @@ pub const RibbonBandingSystem = struct {
                 }
             }
 
-            const j = @intCast(u6, @ctz(c_));
+            const j: u6 = @intCast(@ctz(c_));
             c_ >>= j;
             i_ += j;
         }
@@ -253,8 +253,8 @@ const BumpedLayerBuilder = struct {
     input: std.ArrayListUnmanaged(Input),
 
     fn tableSizeFromEps(n: usize, eps: f64, w: u6) usize {
-        const target = @floatToInt(usize, @intToFloat(f64, n) * (eps + 1));
-        return @max(target, @intCast(usize, w) + 1);
+        const target: usize = @intFromFloat(@as(f64, @floatFromInt(n)) * (eps + 1));
+        return @max(target, @as(usize, @intCast(w)) + 1);
     }
 
     pub fn init(allocator: std.mem.Allocator, n: usize, eps: f64, opts: BuildOptions) error{OutOfMemory}!Self {
@@ -295,7 +295,7 @@ const BumpedLayerBuilder = struct {
             }
         }.lessThan;
 
-        std.sort.sort(Input, self.input.items, {}, lessThan);
+        std.mem.sort(Input, self.input.items, {}, lessThan);
 
         var system = try RibbonBandingSystem.init(allocator, self.m, self.opts.r, self.opts.w);
         defer system.deinit(allocator);
@@ -423,7 +423,7 @@ const BumpedLayerBuilder = struct {
     pub fn buildFallbackTable(self: *BumpedLayerBuilder, allocator: std.mem.Allocator) !RibbonTable {
         const n = self.input.items.len;
         const step = @max(n / 10, 1);
-        var m: usize = @max(n, @intCast(usize, self.opts.w) + 1);
+        var m: usize = @max(n, @as(usize, @intCast(self.opts.w)) + 1);
 
         var i: usize = 0;
         loop: while (i < 50) : (i += 1) {
@@ -508,7 +508,7 @@ pub fn Ribbon(
             const seed = try r.readIntNative(u64);
             const table = try RibbonTable.readFrom(stream);
             return Self{
-                .w = @intCast(u6, w),
+                .w = @intCast(w),
                 .seed = seed,
                 .table = table,
             };
@@ -698,7 +698,7 @@ pub fn Ribbon(
                 }
                 const fallback_table = try RibbonTable.readFrom(stream);
                 return Bumped{
-                    .w = @intCast(u6, w),
+                    .w = @intCast(w),
                     .seed = seed,
                     .layers = layers,
                     .fallback_table = fallback_table,
