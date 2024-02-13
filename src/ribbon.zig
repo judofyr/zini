@@ -770,8 +770,9 @@ pub fn RibbonAutoHash(comptime Key: type) type {
 
 const testing = std.testing;
 const Wyhash = std.hash.Wyhash;
+const TestErrorSet = error{ OutOfMemory, HashCollision, TestExpectedEqual };
 
-fn testRibbon(t: anytype) anyerror!void {
+fn testRibbon(t: anytype) TestErrorSet!void {
     const valueSize = 8;
     t.setValueSize(valueSize);
     t.setBandWidth(32);
@@ -941,19 +942,19 @@ const BumpedRibbonTest = struct {
     }
 };
 
-fn testRibbonIncremental(allocator: std.mem.Allocator) anyerror!void {
+fn testRibbonIncremental(allocator: std.mem.Allocator) TestErrorSet!void {
     var t = RibbonIncrementalTest{ .allocator = allocator, .n = 100 };
     defer t.deinit();
     try testRibbon(&t);
 }
 
-fn testRibbonIterative(allocator: std.mem.Allocator) anyerror!void {
+fn testRibbonIterative(allocator: std.mem.Allocator) TestErrorSet!void {
     var t = RibbonIterativeTest{ .allocator = allocator, .n = 100 };
     defer t.deinit();
     try testRibbon(&t);
 }
 
-fn testBumpedRibbon(allocator: std.mem.Allocator) anyerror!void {
+fn testBumpedRibbon(allocator: std.mem.Allocator) TestErrorSet!void {
     var t = BumpedRibbonTest{ .allocator = allocator, .n = 100 };
     defer t.deinit();
     try testRibbon(&t);
