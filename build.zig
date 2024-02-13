@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
     const target = b.standardTargetOptions(.{});
 
@@ -18,12 +18,17 @@ pub fn build(b: *std.Build) void {
 
     const coverage = b.option(bool, "test-coverage", "Generate test coverage") orelse false;
     if (coverage) {
-        tests_run_step.addArgs(&.{
+        const runner = [_][]const u8{
             "kcov",
             "--include-path",
             ".",
             "coverage", // output dir
-        });
+        };
+
+        const dst = try tests_run_step.argv.addManyAt(0, runner.len);
+        for (runner, 0..) |arg, idx| {
+            dst[idx] = .{ .bytes = b.dupe(arg) };
+        }
     }
 
     const test_step = b.step("test", "Run unit tests");
