@@ -1,11 +1,11 @@
 const std = @import("std");
 
-pub fn build(b: *std.build.Builder) void {
+pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
     const target = b.standardTargetOptions(.{});
 
     const zini = b.addModule("zini", .{
-        .source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .path = "src/main.zig" },
     });
 
     const tests = b.addTest(.{
@@ -29,7 +29,7 @@ pub fn build(b: *std.build.Builder) void {
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&tests_run_step.step);
 
-    const parg = b.createModule(.{ .source_file = .{
+    const parg = b.createModule(.{ .root_source_file = .{
         .path = "../parg/src/parser.zig",
     } });
 
@@ -39,8 +39,8 @@ pub fn build(b: *std.build.Builder) void {
         .target = target,
         .optimize = optimize,
     });
-    pthash.addModule("zini", zini);
-    pthash.addModule("parg", parg);
+    pthash.root_module.addImport("zini", zini);
+    pthash.root_module.addImport("parg", parg);
     b.installArtifact(pthash);
 
     const ribbon = b.addExecutable(.{
@@ -49,7 +49,7 @@ pub fn build(b: *std.build.Builder) void {
         .target = target,
         .optimize = optimize,
     });
-    ribbon.addModule("zini", zini);
-    ribbon.addModule("parg", parg);
+    ribbon.root_module.addImport("zini", zini);
+    ribbon.root_module.addImport("parg", parg);
     b.installArtifact(ribbon);
 }
