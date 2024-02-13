@@ -13,6 +13,10 @@ pub fn writeSlice(w: anytype, arr: anytype) !void {
 }
 
 pub fn readSlice(stream: *std.io.FixedBufferStream([]const u8), T: anytype) ![]const T {
+    // Invariant: stream.pos should be 8-byte aligned before and after `readSlice`
+    std.debug.assert(stream.pos % @alignOf(u64) == 0);
+    defer std.debug.assert(stream.pos % @alignOf(u64) == 0);
+
     var r = stream.reader();
     const len = try r.readInt(u64, endian);
     const byte_len = len * @sizeOf(T);
