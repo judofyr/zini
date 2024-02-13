@@ -9,7 +9,8 @@ pub fn writeSlice(w: anytype, arr: anytype) !void {
     if (byte_len == 0) return;
     try w.writeAll(@as([*]const u8, @ptrCast(&arr[0]))[0..byte_len]);
     // Make sure we're always at a 64-bit boundary.
-    try w.writeByteNTimes(0, byte_len % @alignOf(u64));
+    const padding = (@alignOf(u64) - (byte_len % @alignOf(u64))) % @alignOf(u64);
+    try w.writeByteNTimes(0, padding);
 }
 
 pub fn readSlice(stream: *std.io.FixedBufferStream([]const u8), T: anytype) ![]const T {
@@ -23,7 +24,8 @@ pub fn readSlice(stream: *std.io.FixedBufferStream([]const u8), T: anytype) ![]c
     if (byte_len == 0) return &[_]T{};
     const data = stream.buffer[stream.pos..][0..byte_len];
     stream.pos += byte_len;
-    stream.pos += byte_len % @alignOf(u64);
+    const padding = (@alignOf(u64) - (byte_len % @alignOf(u64))) % @alignOf(u64);
+    stream.pos += padding;
     const cast_data: [*]const T = @ptrCast(@alignCast(&data[0]));
     return cast_data[0..len];
 }
