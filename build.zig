@@ -18,20 +18,18 @@ pub fn build(b: *std.Build) void {
 
     const coverage = b.option(bool, "test-coverage", "Generate test coverage") orelse false;
     if (coverage) {
-        tests_run_step.argv.insertSlice(0, &[_]std.Build.RunStep.Arg{
-            .{ .bytes = b.dupe("kcov") },
-            .{ .bytes = b.dupe("--include-path") },
-            .{ .bytes = b.dupe(".") },
-            .{ .bytes = b.dupe("coverage") }, // output dir
-        }) catch unreachable;
+        tests_run_step.addArgs(&.{
+            "kcov",
+            "--include-path",
+            ".",
+            "coverage", // output dir
+        });
     }
 
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&tests_run_step.step);
 
-    const parg = b.createModule(.{ .root_source_file = .{
-        .path = "../parg/src/parser.zig",
-    } });
+    const parg = b.dependency("parg", .{ .target = target, .optimize = optimize });
 
     const pthash = b.addExecutable(.{
         .name = "zini-pthash",
@@ -40,7 +38,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     pthash.root_module.addImport("zini", zini);
-    pthash.root_module.addImport("parg", parg);
+    pthash.root_module.addImport("parg", parg.module("parg"));
     b.installArtifact(pthash);
 
     const ribbon = b.addExecutable(.{
@@ -50,6 +48,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     ribbon.root_module.addImport("zini", zini);
-    ribbon.root_module.addImport("parg", parg);
+    ribbon.root_module.addImport("parg", parg.module("parg"));
     b.installArtifact(ribbon);
 }
