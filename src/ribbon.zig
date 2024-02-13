@@ -1,9 +1,12 @@
 //! This file implements the ideas from "Fast Succinct Retrieval and Approximate Membership using Ribbon".
 
 const std = @import("std");
+const builtin = @import("builtin");
 const DynamicBitSetUnmanaged = std.bit_set.DynamicBitSetUnmanaged;
 const CompactArray = @import("./CompactArray.zig");
 const utils = @import("./utils.zig");
+
+const endian = builtin.cpu.arch.endian();
 
 fn bitParity(num: u64) u64 {
     return @popCount(num) % 2;
@@ -53,14 +56,14 @@ const RibbonTable = struct {
     }
 
     pub fn writeTo(self: *const Self, w: anytype) !void {
-        try w.writeIntNative(u64, self.n);
+        try w.writeInt(u64, self.n, endian);
         try self.data.writeTo(w);
     }
 
     pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
         var r = stream.reader();
-        var n = try r.readIntNative(u64);
-        var data = try CompactArray.readFrom(stream);
+        const n = try r.readInt(u64, endian);
+        const data = try CompactArray.readFrom(stream);
         return Self{ .n = n, .data = data };
     }
 };
@@ -212,18 +215,18 @@ const BumpedLayer = struct {
     }
 
     pub fn writeTo(self: *const BumpedLayer, w: anytype) !void {
-        try w.writeIntNative(u64, self.bucket_size);
-        try w.writeIntNative(u64, self.upper_threshold);
-        try w.writeIntNative(u64, self.lower_threshold);
+        try w.writeInt(u64, self.bucket_size, endian);
+        try w.writeInt(u64, self.upper_threshold, endian);
+        try w.writeInt(u64, self.lower_threshold, endian);
         try self.thresholds.writeTo(w);
         try self.table.writeTo(w);
     }
 
     pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !BumpedLayer {
         var r = stream.reader();
-        const bucket_size = try r.readIntNative(u64);
-        const upper_threshold = try r.readIntNative(u64);
-        const lower_threshold = try r.readIntNative(u64);
+        const bucket_size = try r.readInt(u64, endian);
+        const upper_threshold = try r.readInt(u64, endian);
+        const lower_threshold = try r.readInt(u64, endian);
         const thresholds = try CompactArray.readFrom(stream);
         const table = try RibbonTable.readFrom(stream);
 
@@ -258,7 +261,7 @@ const BumpedLayerBuilder = struct {
     }
 
     pub fn init(allocator: std.mem.Allocator, n: usize, eps: f64, opts: BuildOptions) error{OutOfMemory}!Self {
-        var input = try std.ArrayListUnmanaged(Input).initCapacity(allocator, n);
+        const input = try std.ArrayListUnmanaged(Input).initCapacity(allocator, n);
 
         return Self{
             .m = tableSizeFromEps(n, eps, opts.w),
@@ -455,9 +458,9 @@ const HashResult = struct {
 };
 
 fn splitHash(hash1: u64, hash2: u64, n: usize, w: u6) HashResult {
-    var i = hash1 % (n - w);
+    const i = hash1 % (n - w);
     const c_mask = ((@as(u64, 1) << w) - 1);
-    var c = (hash2 & c_mask) | 1;
+    const c = (hash2 & c_mask) | 1;
     return .{ .i = i, .c = c };
 }
 
@@ -523,7 +526,7 @@ pub fn Ribbon(
             system: RibbonBandingSystem,
 
             pub fn init(allocator: std.mem.Allocator, n: usize, opts: BuildOptions) error{OutOfMemory}!IncrementalBuilder {
-                var system = try RibbonBandingSystem.init(allocator, n, opts.r, opts.w);
+                const system = try RibbonBandingSystem.init(allocator, n, opts.r, opts.w);
 
                 return IncrementalBuilder{
                     .n = n,
@@ -546,7 +549,7 @@ pub fn Ribbon(
             }
 
             pub fn build(self: IncrementalBuilder, allocator: std.mem.Allocator) error{OutOfMemory}!Self {
-                var table = try self.system.build(allocator);
+                const table = try self.system.build(allocator);
 
                 return Self{
                     .w = self.system.getBandWidth(),
@@ -568,7 +571,7 @@ pub fn Ribbon(
             input: std.ArrayListUnmanaged(Input),
 
             pub fn init(allocator: std.mem.Allocator, n: usize, seed: u64) error{OutOfMemory}!IterativeBuilder {
-                var input = try std.ArrayListUnmanaged(Input).initCapacity(allocator, n);
+                const input = try std.ArrayListUnmanaged(Input).initCapacity(allocator, n);
 
                 return IterativeBuilder{
                     .n = n,
@@ -627,7 +630,7 @@ pub fn Ribbon(
                         }
                     }
 
-                    var table = try system.build(allocator);
+                    const table = try system.build(allocator);
 
                     return Self{
                         .w = opts.w,
@@ -678,9 +681,9 @@ pub fn Ribbon(
             }
 
             pub fn writeTo(self: *const Bumped, w: anytype) !void {
-                try w.writeIntNative(u64, self.w);
-                try w.writeIntNative(u64, self.seed);
-                try w.writeIntNative(u64, self.layers.len);
+                try w.writeInt(u64, self.w, endian);
+                try w.writeInt(u64, self.seed, endian);
+                try w.writeInt(u64, self.layers.len, endian);
                 for (self.layers.slice()) |layer| {
                     try layer.writeTo(w);
                 }
@@ -689,9 +692,9 @@ pub fn Ribbon(
 
             pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Bumped {
                 var r = stream.reader();
-                const w = try r.readIntNative(u64);
-                const seed = try r.readIntNative(u64);
-                const layers_len = try r.readIntNative(u64);
+                const w = try r.readInt(u64, endian);
+                const seed = try r.readInt(u64, endian);
+                const layers_len = try r.readInt(u64, endian);
                 var layers = Layers.init(0) catch unreachable;
                 for (0..layers_len) |_| {
                     layers.appendAssumeCapacity(try BumpedLayer.readFrom(stream));

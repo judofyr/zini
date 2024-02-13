@@ -34,7 +34,7 @@ pub fn encode(allocator: std.mem.Allocator, data: []const u64) !Self {
     defer mapping.deinit();
 
     for (data) |val| {
-        var result = try mapping.getOrPut(val);
+        const result = try mapping.getOrPut(val);
         if (!result.found_existing) {
             result.value_ptr.* = dict.items.len;
             try dict.append(val);

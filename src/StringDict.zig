@@ -1,6 +1,9 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 const StringDict = @This();
+
+const endian = builtin.cpu.arch.endian();
 
 dict: []const u8,
 
@@ -10,13 +13,13 @@ pub fn deinit(self: *StringDict, allocator: std.mem.Allocator) void {
 }
 
 pub fn writeTo(self: *const StringDict, w: anytype) !void {
-    try w.writeIntNative(u64, self.dict.len);
+    try w.writeInt(u64, self.dict.len, endian);
     try w.writeAll(self.dict);
 }
 
 pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !StringDict {
     var r = stream.reader();
-    const len = try r.readIntNative(u64);
+    const len = try r.readInt(u64, endian);
     const dict = stream.buffer[stream.pos..][0..len];
     stream.pos += len;
     return StringDict{
@@ -51,7 +54,7 @@ pub const Builder = struct {
     }
 
     pub fn intern(self: *Builder, key: []const u8) !u64 {
-        var result = try self.dict_positions.getOrPut(key);
+        const result = try self.dict_positions.getOrPut(key);
         if (!result.found_existing) {
             result.value_ptr.* = self.dict_values.items.len;
             try self.dict_values.append(@intCast(key.len));
