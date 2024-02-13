@@ -1,5 +1,6 @@
 /// CompactArray stores a list of n-bit integers packed tightly.
 const std = @import("std");
+const builtin = @import("builtin");
 
 const utils = @import("./utils.zig");
 
@@ -7,6 +8,7 @@ const Self = @This();
 
 const Int = u64;
 const IntLog2 = std.math.Log2Int(Int);
+const endian = builtin.cpu.arch.endian();
 
 data: []const Int,
 width: IntLog2,
@@ -52,7 +54,7 @@ pub fn encode(allocator: std.mem.Allocator, data: []const u64) !Self {
 
 /// Writes the array into an std.io.Writer. This can be read using `readFrom`.
 pub fn writeTo(self: *const Self, w: anytype) !void {
-    try w.writeIntNative(Int, self.width);
+    try w.writeInt(Int, self.width, endian);
     try utils.writeSlice(w, self.data);
 }
 
@@ -61,8 +63,8 @@ pub fn writeTo(self: *const Self, w: anytype) !void {
 /// the buffer.
 pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
     var r = stream.reader();
-    var width = try r.readIntNative(Int);
-    var data = try utils.readSlice(stream, Int);
+    const width = try r.readInt(Int, endian);
+    const data = try utils.readSlice(stream, Int);
     return Self{
         .width = @intCast(width),
         .data = data,
@@ -231,7 +233,7 @@ test "write and read" {
     defer arr.deinit(testing.allocator);
 
     // ensure alignment
-    var buf = try testing.allocator.alignedAlloc(u8, @alignOf(u64), 100);
+    const buf = try testing.allocator.alignedAlloc(u8, @alignOf(u64), 100);
     defer testing.allocator.free(buf);
 
     {

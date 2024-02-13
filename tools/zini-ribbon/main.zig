@@ -1,10 +1,12 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const zini = @import("zini");
 const parg = @import("parg");
 
 const HashFn = zini.pthash.BytesHashFn(zini.DictArray);
 const HashRibbon = zini.ribbon.Ribbon([]const u8, std.hash.Wyhash.hash);
 const StringDict = zini.StringDict;
+const endian = builtin.cpu.arch.endian();
 
 const usage =
     \\USAGE
@@ -117,7 +119,7 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
     var file = try std.fs.cwd().openFile(input.?, .{});
     defer file.close();
 
-    var data = try file.reader().readAllAlloc(allocator, 10 * 1024 * 1024);
+    const data = try file.reader().readAllAlloc(allocator, 10 * 1024 * 1024);
     defer allocator.free(data);
 
     var keys = std.ArrayList([]const u8).init(allocator);
@@ -134,7 +136,7 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
     while (iter.next()) |line| {
         var split = std.mem.split(u8, line, ",");
         _ = split.next().?; // the key
-        var value = try std.fmt.parseInt(u64, split.next().?, 10);
+        const value = try std.fmt.parseInt(u64, split.next().?, 10);
         max_val = @max(max_val, value);
         n += 1;
     }
@@ -156,8 +158,8 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
     iter = std.mem.tokenize(u8, data, "\n");
     while (iter.next()) |line| {
         var split = std.mem.split(u8, line, ",");
-        var key = split.next().?; // the key
-        var value = try std.fmt.parseInt(u64, split.next().?, 10);
+        const key = split.next().?; // the key
+        const value = try std.fmt.parseInt(u64, split.next().?, 10);
         builder.insert(key, value);
     }
 
@@ -174,7 +176,7 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
         const outfile = try std.fs.cwd().createFile(o, .{});
         defer outfile.close();
 
-        try outfile.writer().writeIntNative(u64, n);
+        try outfile.writer().writeInt(u64, n, endian);
         try table.writeTo(outfile.writer());
     }
 }
@@ -215,7 +217,7 @@ pub fn lookup(allocator: std.mem.Allocator, p: anytype) !void {
     defer allocator.free(buf);
 
     var fbs = std.io.fixedBufferStream(@as([]const u8, buf));
-    var n = try fbs.reader().readIntNative(u64);
+    const n = try fbs.reader().readInt(u64, endian);
     var table = try HashRibbon.Bumped.readFrom(&fbs);
     std.debug.print("\n", .{});
 
@@ -225,7 +227,7 @@ pub fn lookup(allocator: std.mem.Allocator, p: anytype) !void {
 
     if (key) |k| {
         std.debug.print("Looking up key={s}:\n", .{k});
-        var value = table.lookup(k);
+        const value = table.lookup(k);
         try stdout.print("{}\n", .{value});
 
         if (bench) {

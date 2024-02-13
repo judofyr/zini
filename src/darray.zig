@@ -78,8 +78,8 @@ pub fn DArray(comptime val: bool) type {
             subblock_inventory: *std.ArrayListUnmanaged(u16),
             overflow_positions: *std.ArrayListUnmanaged(u64),
         ) !void {
-            var fst = cur_block_positions.items[0];
-            var lst = cur_block_positions.items[cur_block_positions.items.len - 1];
+            const fst = cur_block_positions.items[0];
+            const lst = cur_block_positions.items[cur_block_positions.items.len - 1];
             if (lst - fst < max_in_block_distance) {
                 try block_inventory.append(allocator, BlockPosition{ .is_overflow = false, .pos = fst });
                 var i: usize = 0;
@@ -87,7 +87,7 @@ pub fn DArray(comptime val: bool) type {
                     try subblock_inventory.append(allocator, @intCast(cur_block_positions.items[i] - fst));
                 }
             } else {
-                var overflow_pos = overflow_positions.items.len;
+                const overflow_pos = overflow_positions.items.len;
                 try block_inventory.append(allocator, BlockPosition{ .is_overflow = true, .pos = @intCast(overflow_pos) });
                 for (cur_block_positions.items) |pos| {
                     try overflow_positions.append(allocator, pos);
@@ -130,7 +130,7 @@ pub fn DArray(comptime val: bool) type {
             word &= @as(u64, @bitCast(@as(i64, -1))) << word_shift;
 
             while (true) {
-                var popcount = @popCount(word);
+                const popcount = @popCount(word);
                 if (reminder < popcount) break;
                 reminder -= popcount;
                 word_idx += 1;
@@ -166,9 +166,9 @@ pub fn DArray(comptime val: bool) type {
         }
 
         pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
-            var block_inventory = try utils.readSlice(stream, BlockPosition);
-            var subblock_inventory = try utils.readSlice(stream, u16);
-            var overflow_positions = try utils.readSlice(stream, u64);
+            const block_inventory = try utils.readSlice(stream, BlockPosition);
+            const subblock_inventory = try utils.readSlice(stream, u16);
+            const overflow_positions = try utils.readSlice(stream, u64);
             return Self{
                 .block_inventory = @constCast(block_inventory),
                 .subblock_inventory = @constCast(subblock_inventory),

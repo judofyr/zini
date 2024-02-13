@@ -72,10 +72,10 @@ pub fn writeTo(self: *const Self, w: anytype) !void {
 }
 
 pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
-    var mask_arr = try utils.readSlice(stream, usize);
-    var high_bits = DynamicBitSetUnmanaged{ .masks = @constCast(mask_arr.ptr) + 1 };
-    var high_bits_select = try DArray1.readFrom(stream);
-    var low_bits = try CompactArray.readFrom(stream);
+    const mask_arr = try utils.readSlice(stream, usize);
+    const high_bits = DynamicBitSetUnmanaged{ .masks = @constCast(mask_arr.ptr) + 1 };
+    const high_bits_select = try DArray1.readFrom(stream);
+    const low_bits = try CompactArray.readFrom(stream);
     return Self{
         .high_bits = high_bits,
         .high_bits_select = high_bits_select,

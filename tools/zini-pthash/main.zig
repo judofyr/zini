@@ -136,7 +136,7 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
     var file = try std.fs.cwd().openFile(input.?, .{});
     defer file.close();
 
-    var data = try file.reader().readAllAlloc(allocator, 10 * 1024 * 1024);
+    const data = try file.reader().readAllAlloc(allocator, 10 * 1024 * 1024);
     defer allocator.free(data);
 
     var keys = std.ArrayList([]const u8).init(allocator);
@@ -250,7 +250,7 @@ pub fn lookup(allocator: std.mem.Allocator, p: anytype) !void {
 
     if (key) |k| {
         std.debug.print("Looking up key={s}:\n", .{k});
-        var h = hash.get(k);
+        const h = hash.get(k);
         try stdout.print("{}\n", .{h});
         if (dict) |d| {
             try stdout.print("{s}\n", .{d.get(arr.?.get(h))});

@@ -1,8 +1,10 @@
 const std = @import("std");
+const builtin = @import("builtin");
+const endian = builtin.cpu.arch.endian();
 
 pub fn writeSlice(w: anytype, arr: anytype) !void {
     const T = @TypeOf(arr[0]);
-    try w.writeIntNative(u64, arr.len);
+    try w.writeInt(u64, arr.len, endian);
     const byte_len = arr.len * @sizeOf(T);
     if (byte_len == 0) return;
     try w.writeAll(@as([*]const u8, @ptrCast(&arr[0]))[0..byte_len]);
@@ -12,7 +14,7 @@ pub fn writeSlice(w: anytype, arr: anytype) !void {
 
 pub fn readSlice(stream: *std.io.FixedBufferStream([]const u8), T: anytype) ![]const T {
     var r = stream.reader();
-    var len = try r.readIntNative(u64);
+    const len = try r.readInt(u64, endian);
     const byte_len = len * @sizeOf(T);
     if (byte_len == 0) return &[_]T{};
     const data = stream.buffer[stream.pos..][0..byte_len];
