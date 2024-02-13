@@ -44,9 +44,6 @@ The Bumped Ribbon Retrieval will often have **less than 1% overhead**.
 Zini is intended to be used as a library, but also ships the command-line tools `zini-pthash` and `zini-ribbon`.
 As the documentation is a bit lacking it might be useful to look through `tools/zini-{pthash,ribbon}/main.zig` to understand how it's used.
 
-Note that building these executables depends on having [parg](https://github.com/judofyr/parg) cloned in `../parg`.
-You may want to tweak this in `build.zig`.
-
 ```
 USAGE
   ./zig-out/bin/zini-pthash [build | lookup] <options>
