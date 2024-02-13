@@ -22,13 +22,6 @@ jobs:
         run: zig build test
         working-directory: zini
 
-      ## Now try to build the executables:
-      - name: Checkout parg
-        uses: actions/checkout@v3
-        with:
-          repository: judofyr/parg
-          path: parg
-
       - name: Build executables
         run: zig build
         working-directory: zini
