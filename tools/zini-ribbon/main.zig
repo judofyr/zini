@@ -32,7 +32,7 @@ fn fail(comptime msg: []const u8, args: anytype) noreturn {
     std.debug.print("error: ", .{});
     std.debug.print(msg, args);
     std.debug.print("\n", .{});
-    std.os.exit(1);
+    std.posix.exit(1);
 }
 
 pub fn main() !void {
@@ -126,7 +126,7 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
     defer keys.deinit();
 
     if (seed == null) {
-        try std.os.getrandom(std.mem.asBytes(&seed));
+        try std.posix.getrandom(std.mem.asBytes(&seed));
     }
 
     var max_val: u64 = 0;

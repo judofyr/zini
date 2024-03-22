@@ -167,7 +167,7 @@ pub fn HashFn(
 
             var attempts: usize = 0;
             while (attempts < max_attempts) : (attempts += 1) {
-                try std.os.getrandom(std.mem.asBytes(&seed));
+                try std.posix.getrandom(std.mem.asBytes(&seed));
 
                 return buildUsingSeed(allocator, keys, params, seed) catch |err| switch (err) {
                     error.HashCollision => continue,

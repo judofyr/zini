@@ -31,7 +31,7 @@ fn fail(comptime msg: []const u8, args: anytype) noreturn {
     std.debug.print("error: ", .{});
     std.debug.print(msg, args);
     std.debug.print("\n", .{});
-    std.os.exit(1);
+    std.posix.exit(1);
 }
 
 pub fn main() !void {
