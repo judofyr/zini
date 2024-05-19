@@ -5,11 +5,11 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
 
     const zini = b.addModule("zini", .{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
     });
 
     const tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -25,7 +25,7 @@ pub fn build(b: *std.Build) !void {
             "coverage", // output dir
         };
 
-        const dst = try tests_run_step.argv.addManyAt(0, runner.len);
+        const dst = try tests_run_step.argv.addManyAt(b.allocator, 0, runner.len);
         for (runner, 0..) |arg, idx| {
             dst[idx] = .{ .bytes = b.dupe(arg) };
         }
@@ -38,7 +38,7 @@ pub fn build(b: *std.Build) !void {
 
     const pthash = b.addExecutable(.{
         .name = "zini-pthash",
-        .root_source_file = .{ .path = "tools/zini-pthash/main.zig" },
+        .root_source_file = b.path("tools/zini-pthash/main.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -48,7 +48,7 @@ pub fn build(b: *std.Build) !void {
 
     const ribbon = b.addExecutable(.{
         .name = "zini-ribbon",
-        .root_source_file = .{ .path = "tools/zini-ribbon/main.zig" },
+        .root_source_file = b.path("tools/zini-ribbon/main.zig"),
         .target = target,
         .optimize = optimize,
     });
