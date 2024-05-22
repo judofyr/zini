@@ -197,7 +197,7 @@ pub fn lookup(allocator: std.mem.Allocator, p: anytype) !void {
                 } else if (flag.isShort("k") or flag.isLong("key")) {
                     const val = p.nextValue() orelse fail("-k/--key requires value", .{});
                     key = val;
-                } else if (flag.isShort("b") or flag.isLong("bench")) {
+                } else if (flag.isShort("b") or flag.isLong("benchmark")) {
                     bench = true;
                 } else {
                     fail("unknown flag: {s}", .{flag.name});
