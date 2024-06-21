@@ -87,7 +87,7 @@ const testing = std.testing;
 
 test "encode" {
     const seed = 0x0194f614c15227ba;
-    var prng = std.rand.DefaultPrng.init(seed);
+    var prng = std.Random.DefaultPrng.init(seed);
     const r = prng.random();
 
     const n = 100000;

@@ -210,7 +210,7 @@ fn testBitSet(
 
 test "dense" {
     const seed = 0x0194f614c15227ba;
-    var prng = std.rand.DefaultPrng.init(seed);
+    var prng = std.Random.DefaultPrng.init(seed);
     const r = prng.random();
 
     var result = std.ArrayList(usize).init(testing.allocator);
@@ -234,7 +234,7 @@ test "dense" {
 
 test "sparse" {
     const seed = 0x0194f614c15227ba;
-    var prng = std.rand.DefaultPrng.init(seed);
+    var prng = std.Random.DefaultPrng.init(seed);
     const r = prng.random();
 
     var result = std.ArrayList(usize).init(testing.allocator);

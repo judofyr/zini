@@ -783,7 +783,7 @@ fn testRibbon(t: anytype) TestErrorSet!void {
 
     {
         // Insert random data:
-        var prng = std.rand.DefaultPrng.init(seed);
+        var prng = std.Random.DefaultPrng.init(seed);
         const r = prng.random();
 
         for (0..t.n) |idx| {
@@ -796,7 +796,7 @@ fn testRibbon(t: anytype) TestErrorSet!void {
 
     {
         // Look it up again:
-        var prng = std.rand.DefaultPrng.init(seed);
+        var prng = std.Random.DefaultPrng.init(seed);
         const r = prng.random();
 
         for (0..t.n) |idx| {
