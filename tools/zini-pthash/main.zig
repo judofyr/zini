@@ -142,9 +142,9 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
     var keys = std.ArrayList([]const u8).init(allocator);
     defer keys.deinit();
 
-    var iter = std.mem.tokenize(u8, data, "\n");
+    var iter = std.mem.tokenizeScalar(u8, data, '\n');
     while (iter.next()) |line| {
-        var split = std.mem.split(u8, line, " ");
+        var split = std.mem.splitScalar(u8, line, ' ');
         try keys.append(split.next().?);
     }
 
@@ -166,9 +166,9 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
         var arr_slice = try allocator.alloc(u64, hash.n);
         defer allocator.free(arr_slice);
 
-        iter = std.mem.tokenize(u8, data, "\n");
+        iter = std.mem.tokenizeScalar(u8, data, '\n');
         while (iter.next()) |line| {
-            var split = std.mem.split(u8, line, " ");
+            var split = std.mem.splitScalar(u8, line, ' ');
             const key = split.next().?;
             const value = split.next().?;
             const key_idx = hash.get(key);

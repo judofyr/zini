@@ -132,9 +132,9 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
     var max_val: u64 = 0;
     var n: usize = 0;
 
-    var iter = std.mem.tokenize(u8, data, "\n");
+    var iter = std.mem.tokenizeScalar(u8, data, '\n');
     while (iter.next()) |line| {
-        var split = std.mem.split(u8, line, ",");
+        var split = std.mem.splitScalar(u8, line, ',');
         _ = split.next().?; // the key
         const value = try std.fmt.parseInt(u64, split.next().?, 10);
         max_val = @max(max_val, value);
@@ -155,9 +155,9 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
     var builder = try HashRibbon.BumpedBuilder.init(allocator, n, eps, opts);
     defer builder.deinit(allocator);
 
-    iter = std.mem.tokenize(u8, data, "\n");
+    iter = std.mem.tokenizeScalar(u8, data, '\n');
     while (iter.next()) |line| {
-        var split = std.mem.split(u8, line, ",");
+        var split = std.mem.splitScalar(u8, line, ',');
         const key = split.next().?; // the key
         const value = try std.fmt.parseInt(u64, split.next().?, 10);
         builder.insert(key, value);
