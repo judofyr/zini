@@ -85,8 +85,5 @@ pub fn main() !void {
     var encoded = try zini.EliasFano.encode(allocator, numbers.items);
     defer encoded.deinit(allocator);
 
-    var counter = std.io.countingWriter(std.io.null_writer);
-    try encoded.writeTo(counter.writer());
-
-    std.debug.print("The data would compress to: {} bytes\n", .{counter.bytes_written});
+    std.debug.print("The data would compress to: {} bytes\n", .{encoded.bitsWithoutConstantAccess() / 8});
 }

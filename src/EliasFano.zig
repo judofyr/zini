@@ -63,6 +63,12 @@ pub fn bits(self: *const Self) u64 {
     return self.low_bits.bits() + self.high_bits_select.bits() + len * @bitSizeOf(usize);
 }
 
+pub fn bitsWithoutConstantAccess(self: *const Self) u64 {
+    const masks = self.high_bits.masks;
+    const len = (masks - 1)[0];
+    return self.low_bits.bits() + len * @bitSizeOf(usize);
+}
+
 pub fn writeTo(self: *const Self, w: anytype) !void {
     const masks = self.high_bits.masks;
     const len = (masks - 1)[0];
