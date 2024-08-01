@@ -23,13 +23,12 @@ pub fn encode(allocator: std.mem.Allocator, data: []const u64) !Self {
     const n = data.len;
     const u = data[data.len - 1];
 
-    const num_bits: u6 = @intCast(std.math.log2_int(u64, u) + 1);
     const l = if (u > data.len) std.math.log2_int(u64, u / data.len) + 1 else 0;
     const l_mask = (@as(u64, 1) << l) - 1;
-    const h = num_bits - l;
+    const max_h = u >> l;
 
     // We need to store `2^h-1` zeroes and `n` ones.
-    var high_bits = try DynamicBitSetUnmanaged.initEmpty(allocator, (@as(u64, 1) << h) - 1 + n);
+    var high_bits = try DynamicBitSetUnmanaged.initEmpty(allocator, max_h + n);
 
     var low_bits = try CompactArray.Mutable.init(allocator, l, data.len);
 
