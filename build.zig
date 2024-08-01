@@ -55,4 +55,14 @@ pub fn build(b: *std.Build) !void {
     ribbon.root_module.addImport("zini", zini);
     ribbon.root_module.addImport("parg", parg.module("parg"));
     b.installArtifact(ribbon);
+
+    const seqz = b.addExecutable(.{
+        .name = "zini-seqz",
+        .root_source_file = b.path("tools/zini-seqz/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    seqz.root_module.addImport("zini", zini);
+    seqz.root_module.addImport("parg", parg.module("parg"));
+    b.installArtifact(seqz);
 }
