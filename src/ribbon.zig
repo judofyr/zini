@@ -464,7 +464,7 @@ fn splitHash(hash1: u64, hash2: u64, n: usize, w: u6) HashResult {
     return .{ .i = i, .c = c };
 }
 
-const BuildOptions = struct {
+pub const BuildOptions = struct {
     r: u6,
     w: u6,
     seed: u64 = 100,

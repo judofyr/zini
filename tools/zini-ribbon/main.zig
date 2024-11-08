@@ -146,7 +146,7 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
     std.debug.print("\n", .{});
     std.debug.print("Building table for r={} value bits and eps={}...\n", .{ r, eps });
 
-    const opts = .{
+    const opts = zini.ribbon.BuildOptions{
         .r = r,
         .w = w,
         .seed = seed.?,
