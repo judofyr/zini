@@ -373,7 +373,7 @@ const BumpedLayerBuilder = struct {
             while (k < j) : (k += 1) {
                 const input = inputs[k];
                 if (input.hash_result.i - bucket_start >= threshold_value) break;
-                if (inserted.pop()) |idx| {
+                if (inserted.pop().?) |idx| {
                     system.clearRow(idx);
                 }
             }
