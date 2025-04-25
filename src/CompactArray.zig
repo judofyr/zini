@@ -233,7 +233,7 @@ test "write and read" {
     defer arr.deinit(testing.allocator);
 
     // ensure alignment
-    const buf = try testing.allocator.alignedAlloc(u8, @alignOf(u64), 100);
+    const buf = try testing.allocator.alignedAlloc(u8, std.mem.Alignment.of(u64), 100);
     defer testing.allocator.free(buf);
 
     {
