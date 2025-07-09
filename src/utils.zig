@@ -63,7 +63,7 @@ pub fn testFailingAllocator(comptime t: fn (allocator: std.mem.Allocator) anyerr
 const testing = std.testing;
 
 test "readSlice / writeSlice must maintain 8-byte alignment" {
-    var buf: [128]u8 = undefined;
+    var buf: [128]u8 align(8) = undefined;
     var write_stream = std.io.fixedBufferStream(buf[0..]);
 
     const writer = write_stream.writer();
