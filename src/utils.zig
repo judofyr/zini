@@ -23,9 +23,7 @@ pub fn readSlice(stream: *std.io.FixedBufferStream([]const u8), T: anytype) ![]c
     const byte_len = len * @sizeOf(T);
     if (byte_len == 0) return &[_]T{};
     const data = stream.buffer[stream.pos..][0..byte_len];
-    stream.pos += byte_len;
-    const padding = (@alignOf(u64) - (byte_len % @alignOf(u64))) % @alignOf(u64);
-    stream.pos += padding;
+    stream.pos = std.mem.alignForward(usize, stream.pos + byte_len, @alignOf(u64));
     const cast_data: [*]const T = @ptrCast(@alignCast(&data[0]));
     return cast_data[0..len];
 }
