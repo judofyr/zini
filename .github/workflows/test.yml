@@ -15,9 +15,7 @@ jobs:
         with:
           path: zini
 
-      - uses: goto-bus-stop/setup-zig@v1
-        with:
-          version: master
+      - uses: mlugg/setup-zig@v2
 
       - name: Formatting
         run: zig fmt --check src/*.zig
