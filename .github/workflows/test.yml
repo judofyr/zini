@@ -16,6 +16,8 @@ jobs:
           path: zini
 
       - uses: mlugg/setup-zig@v2
+        with:
+          version: master
 
       - name: Formatting
         run: zig fmt --check src/*.zig
