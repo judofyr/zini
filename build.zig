@@ -6,12 +6,12 @@ pub fn build(b: *std.Build) !void {
 
     const zini = b.addModule("zini", .{
         .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
     });
 
     const tests = b.addTest(.{
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = zini,
     });
     const tests_run_step = b.addRunArtifact(tests);
     tests_run_step.has_side_effects = true;
@@ -34,13 +34,15 @@ pub fn build(b: *std.Build) !void {
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&tests_run_step.step);
 
-    const parg = b.dependency("parg", .{ .target = target, .optimize = optimize });
+    const parg = b.dependency("parg", .{ .target = target });
 
     const pthash = b.addExecutable(.{
         .name = "zini-pthash",
-        .root_source_file = b.path("tools/zini-pthash/main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tools/zini-pthash/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     pthash.root_module.addImport("zini", zini);
     pthash.root_module.addImport("parg", parg.module("parg"));
@@ -48,9 +50,11 @@ pub fn build(b: *std.Build) !void {
 
     const ribbon = b.addExecutable(.{
         .name = "zini-ribbon",
-        .root_source_file = b.path("tools/zini-ribbon/main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tools/zini-ribbon/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     ribbon.root_module.addImport("zini", zini);
     ribbon.root_module.addImport("parg", parg.module("parg"));
@@ -58,9 +62,11 @@ pub fn build(b: *std.Build) !void {
 
     const seqz = b.addExecutable(.{
         .name = "zini-seqz",
-        .root_source_file = b.path("tools/zini-seqz/main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tools/zini-seqz/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     seqz.root_module.addImport("zini", zini);
     seqz.root_module.addImport("parg", parg.module("parg"));

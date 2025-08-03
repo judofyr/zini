@@ -136,7 +136,8 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
     var file = try std.fs.cwd().openFile(input.?, .{});
     defer file.close();
 
-    const data = try file.reader().readAllAlloc(allocator, 10 * 1024 * 1024);
+    var reader = file.reader(&.{});
+    const data = try reader.interface.allocRemaining(allocator, .unlimited);
     defer allocator.free(data);
 
     var keys = std.ArrayList([]const u8).init(allocator);
@@ -189,17 +190,23 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
         const outfile = try std.fs.cwd().createFile(o, .{});
         defer outfile.close();
 
-        try hash.writeTo(outfile.writer());
+        var buf: [4096]u8 = undefined;
+        var writer = outfile.writer(&buf);
+
+        try hash.writeTo(&writer.interface);
 
         if (build_dict) {
-            try dict.?.writeTo(outfile.writer());
-            try arr.?.writeTo(outfile.writer());
+            try dict.?.writeTo(&writer.interface);
+            try arr.?.writeTo(&writer.interface);
         }
+
+        try writer.interface.flush();
     }
 }
 
 pub fn lookup(allocator: std.mem.Allocator, p: anytype) !void {
-    const stdout = std.io.getStdOut().writer();
+    var stdout_buf: [4096]u8 = undefined;
+    var stdout = std.fs.File.stdout().writer(&stdout_buf);
 
     var input: ?[]const u8 = null;
     var key: ?[]const u8 = null;
@@ -233,14 +240,14 @@ pub fn lookup(allocator: std.mem.Allocator, p: anytype) !void {
     const buf = try std.fs.cwd().readFileAlloc(allocator, input.?, 10 * 1024 * 1024);
     defer allocator.free(buf);
 
-    var fbs = std.io.fixedBufferStream(@as([]const u8, buf));
-    const hash = try HashFn.readFrom(&fbs);
+    var r = std.Io.Reader.fixed(buf);
+    const hash = try HashFn.readFrom(&r);
     var dict: ?StringDict = null;
     var arr: ?zini.DictArray = null;
 
-    if (fbs.pos < fbs.buffer.len) {
-        dict = try StringDict.readFrom(&fbs);
-        arr = try zini.DictArray.readFrom(&fbs);
+    if (r.end < r.buffer.len) {
+        dict = try StringDict.readFrom(&r);
+        arr = try zini.DictArray.readFrom(&r);
     }
 
     std.debug.print("\n", .{});
@@ -251,9 +258,9 @@ pub fn lookup(allocator: std.mem.Allocator, p: anytype) !void {
     if (key) |k| {
         std.debug.print("Looking up key={s}:\n", .{k});
         const h = hash.get(k);
-        try stdout.print("{}\n", .{h});
+        try stdout.interface.print("{}\n", .{h});
         if (dict) |d| {
-            try stdout.print("{s}\n", .{d.get(arr.?.get(h))});
+            try stdout.interface.print("{s}\n", .{d.get(arr.?.get(h))});
         }
 
         if (bench) {
@@ -271,4 +278,6 @@ pub fn lookup(allocator: std.mem.Allocator, p: anytype) !void {
             std.debug.print("{} ns/read (avg of {} iterations)\n", .{ dur / n, n });
         }
     }
+
+    try stdout.interface.flush();
 }

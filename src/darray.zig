@@ -165,10 +165,10 @@ pub fn DArray(comptime val: bool) type {
             try utils.writeSlice(w, self.overflow_positions);
         }
 
-        pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
-            const block_inventory = try utils.readSlice(stream, BlockPosition);
-            const subblock_inventory = try utils.readSlice(stream, u16);
-            const overflow_positions = try utils.readSlice(stream, u64);
+        pub fn readFrom(r: *std.Io.Reader) !Self {
+            const block_inventory = try utils.readSlice(r, BlockPosition);
+            const subblock_inventory = try utils.readSlice(r, u16);
+            const overflow_positions = try utils.readSlice(r, u64);
             return Self{
                 .block_inventory = @constCast(block_inventory),
                 .subblock_inventory = @constCast(subblock_inventory),

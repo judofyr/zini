@@ -52,12 +52,11 @@ const Bucketer = struct {
         try w.writeInt(u64, self.p2, endian);
     }
 
-    pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Bucketer {
-        var r = stream.reader();
-        const n = try r.readInt(u64, endian);
-        const m = try r.readInt(u64, endian);
-        const p1 = try r.readInt(u64, endian);
-        const p2 = try r.readInt(u64, endian);
+    pub fn readFrom(r: *std.Io.Reader) !Bucketer {
+        const n = try r.takeInt(u64, endian);
+        const m = try r.takeInt(u64, endian);
+        const p1 = try r.takeInt(u64, endian);
+        const p2 = try r.takeInt(u64, endian);
         return Bucketer{
             .n = n,
             .m = m,
@@ -297,7 +296,7 @@ pub fn HashFn(
             };
         }
 
-        pub fn writeTo(self: *const Self, w: anytype) !void {
+        pub fn writeTo(self: *const Self, w: *std.Io.Writer) !void {
             try w.writeInt(u64, self.n, endian);
             try w.writeInt(u64, self.seed, endian);
             try self.bucketer.writeTo(w);
@@ -305,13 +304,12 @@ pub fn HashFn(
             try self.pivots.writeTo(w);
         }
 
-        pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
-            var r = stream.reader();
-            const n = try r.readInt(u64, endian);
-            const seed = try r.readInt(u64, endian);
-            const bucketer = try Bucketer.readFrom(stream);
-            const free_slots = try FreeSlotEncoding.readFrom(stream);
-            const pivots = try Encoding.readFrom(stream);
+        pub fn readFrom(r: *std.Io.Reader) !Self {
+            const n = try r.takeInt(u64, endian);
+            const seed = try r.takeInt(u64, endian);
+            const bucketer = try Bucketer.readFrom(r);
+            const free_slots = try FreeSlotEncoding.readFrom(r);
+            const pivots = try Encoding.readFrom(r);
             return Self{
                 .n = n,
                 .seed = seed,

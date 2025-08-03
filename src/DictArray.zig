@@ -53,9 +53,9 @@ pub fn writeTo(self: *const Self, w: anytype) !void {
     try self.arr.writeTo(w);
 }
 
-pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
-    const dict = try CompactArray.readFrom(stream);
-    const arr = try CompactArray.readFrom(stream);
+pub fn readFrom(r: *std.Io.Reader) !Self {
+    const dict = try CompactArray.readFrom(r);
+    const arr = try CompactArray.readFrom(r);
     return Self{
         .dict = dict,
         .arr = arr,

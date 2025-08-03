@@ -17,11 +17,10 @@ pub fn writeTo(self: *const StringDict, w: anytype) !void {
     try w.writeAll(self.dict);
 }
 
-pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !StringDict {
-    var r = stream.reader();
-    const len = try r.readInt(u64, endian);
-    const dict = stream.buffer[stream.pos..][0..len];
-    stream.pos += len;
+pub fn readFrom(r: *std.Io.Reader) !StringDict {
+    const len = try r.takeInt(u64, endian);
+    const dict = r.buffer[r.seek..][0..len];
+    r.seek += len;
     return StringDict{
         .dict = dict,
     };

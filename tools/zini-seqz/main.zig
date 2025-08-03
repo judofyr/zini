@@ -60,17 +60,17 @@ pub fn main() !void {
     var file = try std.fs.cwd().openFile(f, .{});
     defer file.close();
 
-    var counting_file = std.io.countingReader(file.reader());
+    var buf: [4096]u8 = undefined;
+
+    var r = file.reader(&buf);
 
     var numbers = std.ArrayList(u64).init(allocator);
     defer numbers.deinit();
 
     std.debug.print("Reading {s}\n", .{f});
 
-    var r = counting_file.reader();
     while (true) {
-        var buf: [32]u8 = undefined;
-        const line = r.readUntilDelimiter(&buf, '\n') catch |err| switch (err) {
+        const line = r.interface.takeSentinel('\n') catch |err| switch (err) {
             error.EndOfStream => break,
             else => return err,
         };
@@ -80,7 +80,7 @@ pub fn main() !void {
 
     std.mem.sort(u64, numbers.items, {}, std.sort.asc(u64));
 
-    std.debug.print("Compressing {} numbers ({} bytes)...\n", .{ numbers.items.len, counting_file.bytes_read });
+    std.debug.print("Compressing {} numbers ({} bytes)...\n", .{ numbers.items.len, r.logicalPos() });
 
     var encoded = try zini.EliasFano.encode(allocator, numbers.items);
     defer encoded.deinit(allocator);

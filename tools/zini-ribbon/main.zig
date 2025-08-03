@@ -119,7 +119,8 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
     var file = try std.fs.cwd().openFile(input.?, .{});
     defer file.close();
 
-    const data = try file.reader().readAllAlloc(allocator, 10 * 1024 * 1024);
+    var reader = file.reader(&.{});
+    const data = try reader.interface.allocRemaining(allocator, .unlimited);
     defer allocator.free(data);
 
     var keys = std.ArrayList([]const u8).init(allocator);
@@ -173,16 +174,22 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
     if (output) |o| {
         std.debug.print("\n", .{});
         std.debug.print("Writing to {s}\n", .{o});
+        var buf: [4096]u8 = undefined;
         const outfile = try std.fs.cwd().createFile(o, .{});
         defer outfile.close();
 
-        try outfile.writer().writeInt(u64, n, endian);
-        try table.writeTo(outfile.writer());
+        var writer = outfile.writer(&buf);
+
+        try writer.interface.writeInt(u64, n, endian);
+        try table.writeTo(&writer.interface);
+
+        try writer.interface.flush();
     }
 }
 
 pub fn lookup(allocator: std.mem.Allocator, p: anytype) !void {
-    const stdout = std.io.getStdOut().writer();
+    var stdout_buf: [4096]u8 = undefined;
+    var stdout = std.fs.File.stdout().writer(&stdout_buf);
 
     var input: ?[]const u8 = null;
     var key: ?[]const u8 = null;
@@ -216,9 +223,9 @@ pub fn lookup(allocator: std.mem.Allocator, p: anytype) !void {
     const buf = try std.fs.cwd().readFileAlloc(allocator, input.?, 10 * 1024 * 1024);
     defer allocator.free(buf);
 
-    var fbs = std.io.fixedBufferStream(@as([]const u8, buf));
-    const n = try fbs.reader().readInt(u64, endian);
-    var table = try HashRibbon.Bumped.readFrom(&fbs);
+    var reader = std.Io.Reader.fixed(buf);
+    const n = try reader.takeInt(u64, endian);
+    var table = try HashRibbon.Bumped.readFrom(&reader);
     std.debug.print("\n", .{});
 
     std.debug.print("Successfully loaded hash function:\n", .{});
@@ -228,7 +235,8 @@ pub fn lookup(allocator: std.mem.Allocator, p: anytype) !void {
     if (key) |k| {
         std.debug.print("Looking up key={s}:\n", .{k});
         const value = table.lookup(k);
-        try stdout.print("{}\n", .{value});
+        try stdout.interface.print("{}\n", .{value});
+        try stdout.interface.flush();
 
         if (bench) {
             const m = 1000;

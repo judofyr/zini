@@ -53,7 +53,7 @@ pub fn encode(allocator: std.mem.Allocator, data: []const u64) !Self {
 }
 
 /// Writes the array into an std.io.Writer. This can be read using `readFrom`.
-pub fn writeTo(self: *const Self, w: anytype) !void {
+pub fn writeTo(self: *const Self, w: *std.Io.Writer) !void {
     try w.writeInt(Int, self.width, endian);
     try utils.writeSlice(w, self.data);
 }
@@ -61,10 +61,9 @@ pub fn writeTo(self: *const Self, w: anytype) !void {
 /// Reads an array from a buffer. Note that this will not allocate, but will
 /// instead create a new CompactArray which points directly to the data in
 /// the buffer.
-pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
-    var r = stream.reader();
-    const width = try r.readInt(Int, endian);
-    const data = try utils.readSlice(stream, Int);
+pub fn readFrom(r: *std.Io.Reader) !Self {
+    const width = try r.takeInt(Int, endian);
+    const data = try utils.readSlice(r, Int);
     return Self{
         .width = @intCast(width),
         .data = data,
@@ -237,15 +236,15 @@ test "write and read" {
     defer testing.allocator.free(buf);
 
     {
+        var writer = std.Io.Writer.fixed(buf);
         // Write
-        var fbs = std.io.fixedBufferStream(buf);
-        try arr.writeTo(fbs.writer());
+        try arr.writeTo(&writer);
     }
 
     {
         // Read
-        var fbs = std.io.fixedBufferStream(@as([]const u8, buf));
-        var arr2 = try Self.readFrom(&fbs);
+        var reader = std.Io.Reader.fixed(buf);
+        var arr2 = try Self.readFrom(&reader);
 
         for (vals, 0..) |val, idx| {
             try testing.expectEqual(val, arr2.get(idx));

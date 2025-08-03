@@ -60,10 +60,9 @@ const RibbonTable = struct {
         try self.data.writeTo(w);
     }
 
-    pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Self {
-        var r = stream.reader();
-        const n = try r.readInt(u64, endian);
-        const data = try CompactArray.readFrom(stream);
+    pub fn readFrom(r: *std.Io.Reader) !Self {
+        const n = try r.takeInt(u64, endian);
+        const data = try CompactArray.readFrom(r);
         return Self{ .n = n, .data = data };
     }
 };
@@ -222,13 +221,12 @@ const BumpedLayer = struct {
         try self.table.writeTo(w);
     }
 
-    pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !BumpedLayer {
-        var r = stream.reader();
-        const bucket_size = try r.readInt(u64, endian);
-        const upper_threshold = try r.readInt(u64, endian);
-        const lower_threshold = try r.readInt(u64, endian);
-        const thresholds = try CompactArray.readFrom(stream);
-        const table = try RibbonTable.readFrom(stream);
+    pub fn readFrom(r: *std.Io.Reader) !BumpedLayer {
+        const bucket_size = try r.takeInt(u64, endian);
+        const upper_threshold = try r.takeInt(u64, endian);
+        const lower_threshold = try r.takeInt(u64, endian);
+        const thresholds = try CompactArray.readFrom(r);
+        const table = try RibbonTable.readFrom(r);
 
         return BumpedLayer{
             .bucket_size = bucket_size,
@@ -680,7 +678,7 @@ pub fn Ribbon(
                 return result;
             }
 
-            pub fn writeTo(self: *const Bumped, w: anytype) !void {
+            pub fn writeTo(self: *const Bumped, w: *std.Io.Writer) !void {
                 try w.writeInt(u64, self.w, endian);
                 try w.writeInt(u64, self.seed, endian);
                 try w.writeInt(u64, self.layers.len, endian);
@@ -690,16 +688,15 @@ pub fn Ribbon(
                 try self.fallback_table.writeTo(w);
             }
 
-            pub fn readFrom(stream: *std.io.FixedBufferStream([]const u8)) !Bumped {
-                var r = stream.reader();
-                const w = try r.readInt(u64, endian);
-                const seed = try r.readInt(u64, endian);
-                const layers_len = try r.readInt(u64, endian);
+            pub fn readFrom(r: *std.Io.Reader) !Bumped {
+                const w = try r.takeInt(u64, endian);
+                const seed = try r.takeInt(u64, endian);
+                const layers_len = try r.takeInt(u64, endian);
                 var layers = Layers.init(0) catch unreachable;
                 for (0..layers_len) |_| {
-                    layers.appendAssumeCapacity(try BumpedLayer.readFrom(stream));
+                    layers.appendAssumeCapacity(try BumpedLayer.readFrom(r));
                 }
-                const fallback_table = try RibbonTable.readFrom(stream);
+                const fallback_table = try RibbonTable.readFrom(r);
                 return Bumped{
                     .w = @intCast(w),
                     .seed = seed,
@@ -773,10 +770,11 @@ const Wyhash = std.hash.Wyhash;
 const TestErrorSet = error{ OutOfMemory, HashCollision, TestExpectedEqual };
 
 fn testRibbon(t: anytype) TestErrorSet!void {
+    const settings = @TypeOf(t.*).settings;
     const valueSize = 8;
-    t.setValueSize(valueSize);
-    t.setBandWidth(32);
-    t.setSeed(100);
+    settings.setValueSize(t, valueSize);
+    settings.setBandWidth(t, 32);
+    settings.setSeed(t, 100);
     try t.init();
 
     const seed = 0x0194f614c15227ba;
@@ -822,7 +820,7 @@ fn RibbonSettings(comptime Self: type) type {
             self.seed = seed;
         }
 
-        fn options(self: Self) BuildOptions {
+        fn options(self: *const Self) BuildOptions {
             return .{
                 .r = self.r.?,
                 .w = self.w.?,
@@ -844,7 +842,7 @@ const RibbonIncrementalTest = struct {
     builder: ?RibbonU64.IncrementalBuilder = null,
     table: ?RibbonU64 = null,
 
-    usingnamespace RibbonSettings(Self);
+    const settings = RibbonSettings(Self);
 
     fn deinit(self: *Self) void {
         if (self.builder) |*b| b.deinit(self.allocator);
@@ -852,7 +850,7 @@ const RibbonIncrementalTest = struct {
     }
 
     fn init(self: *Self) !void {
-        self.builder = try RibbonU64.IncrementalBuilder.init(self.allocator, self.n * 2, self.options());
+        self.builder = try RibbonU64.IncrementalBuilder.init(self.allocator, self.n * 2, settings.options(self));
     }
 
     fn insert(self: *Self, key: u64, value: u64) !void {
@@ -881,7 +879,7 @@ const RibbonIterativeTest = struct {
     builder: ?RibbonU64.IterativeBuilder = null,
     table: ?RibbonU64 = null,
 
-    usingnamespace RibbonSettings(Self);
+    const settings = RibbonSettings(Self);
 
     fn deinit(self: *Self) void {
         if (self.builder) |*b| b.deinit(self.allocator);
@@ -889,7 +887,7 @@ const RibbonIterativeTest = struct {
     }
 
     fn init(self: *Self) !void {
-        self.builder = try RibbonU64.IterativeBuilder.init(self.allocator, self.n, self.options().seed);
+        self.builder = try RibbonU64.IterativeBuilder.init(self.allocator, self.n, self.seed.?);
     }
 
     fn insert(self: *Self, key: u64, value: u64) !void {
@@ -897,7 +895,7 @@ const RibbonIterativeTest = struct {
     }
 
     fn build(self: *Self) !void {
-        self.table = try self.builder.?.build(self.allocator, self.options());
+        self.table = try self.builder.?.build(self.allocator, settings.options(self));
     }
 
     fn lookup(self: *Self, key: u64) u64 {
@@ -918,7 +916,7 @@ const BumpedRibbonTest = struct {
     builder: ?RibbonU64.BumpedBuilder = null,
     table: ?RibbonU64.Bumped = null,
 
-    usingnamespace RibbonSettings(Self);
+    const settings = RibbonSettings(Self);
 
     fn deinit(self: *Self) void {
         if (self.builder) |*b| b.deinit(self.allocator);
@@ -926,7 +924,7 @@ const BumpedRibbonTest = struct {
     }
 
     fn init(self: *Self) !void {
-        self.builder = try RibbonU64.BumpedBuilder.init(self.allocator, self.n, 0, self.options());
+        self.builder = try RibbonU64.BumpedBuilder.init(self.allocator, self.n, 0, settings.options(self));
     }
 
     fn insert(self: *Self, key: u64, value: u64) !void {

@@ -2,7 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const endian = builtin.cpu.arch.endian();
 
-pub fn writeSlice(w: anytype, arr: anytype) !void {
+pub fn writeSlice(w: *std.io.Writer, arr: anytype) !void {
     const T = @TypeOf(arr[0]);
     try w.writeInt(u64, arr.len, endian);
     const byte_len = arr.len * @sizeOf(T);
@@ -10,20 +10,19 @@ pub fn writeSlice(w: anytype, arr: anytype) !void {
     try w.writeAll(@as([*]const u8, @ptrCast(&arr[0]))[0..byte_len]);
     // Make sure we're always at a 64-bit boundary.
     const padding = (@alignOf(u64) - (byte_len % @alignOf(u64))) % @alignOf(u64);
-    try w.writeByteNTimes(0, padding);
+    _ = try w.splatByte(0, padding);
 }
 
-pub fn readSlice(stream: *std.io.FixedBufferStream([]const u8), T: anytype) ![]const T {
+pub fn readSlice(r: *std.Io.Reader, T: anytype) ![]const T {
     // Invariant: stream.pos should be 8-byte aligned before and after `readSlice`
-    std.debug.assert(stream.pos % @alignOf(u64) == 0);
-    defer std.debug.assert(stream.pos % @alignOf(u64) == 0);
+    std.debug.assert(r.seek % @alignOf(u64) == 0);
+    defer std.debug.assert(r.seek % @alignOf(u64) == 0);
 
-    var r = stream.reader();
-    const len = try r.readInt(u64, endian);
+    const len = try r.takeInt(u64, endian);
     const byte_len = len * @sizeOf(T);
     if (byte_len == 0) return &[_]T{};
-    const data = stream.buffer[stream.pos..][0..byte_len];
-    stream.pos = std.mem.alignForward(usize, stream.pos + byte_len, @alignOf(u64));
+    const data = r.buffer[r.seek..][0..byte_len];
+    r.seek = std.mem.alignForward(usize, r.seek + byte_len, @alignOf(u64));
     const cast_data: [*]const T = @ptrCast(@alignCast(&data[0]));
     return cast_data[0..len];
 }
@@ -64,14 +63,12 @@ const testing = std.testing;
 
 test "readSlice / writeSlice must maintain 8-byte alignment" {
     var buf: [128]u8 align(8) = undefined;
-    var write_stream = std.io.fixedBufferStream(buf[0..]);
+    var writer = std.Io.Writer.fixed(&buf);
 
-    const writer = write_stream.writer();
+    try writeSlice(&writer, [_]u8{ 1, 2, 3 });
+    try writeSlice(&writer, [_]u64{2});
 
-    try writeSlice(writer, [_]u8{ 1, 2, 3 });
-    try writeSlice(writer, [_]u64{2});
-
-    var read_stream = std.io.fixedBufferStream(@as([]const u8, buf[0..]));
+    var read_stream = std.Io.Reader.fixed(&buf);
 
     try testing.expectEqualSlices(u8, &.{ 1, 2, 3 }, try readSlice(&read_stream, u8));
     try testing.expectEqualSlices(u64, &.{2}, try readSlice(&read_stream, u64));
