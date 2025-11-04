@@ -24,11 +24,11 @@ pub fn get(self: *const Self, idx: usize) u64 {
 }
 
 pub fn encode(allocator: std.mem.Allocator, data: []const u64) !Self {
-    var dict = std.ArrayList(u64).init(allocator);
-    defer dict.deinit();
+    var dict: std.ArrayList(u64) = .empty;
+    defer dict.deinit(allocator);
 
     var arr = try std.ArrayList(u64).initCapacity(allocator, data.len);
-    defer arr.deinit();
+    defer arr.deinit(allocator);
 
     var mapping = std.hash_map.AutoHashMap(u64, usize).init(allocator);
     defer mapping.deinit();
@@ -37,9 +37,9 @@ pub fn encode(allocator: std.mem.Allocator, data: []const u64) !Self {
         const result = try mapping.getOrPut(val);
         if (!result.found_existing) {
             result.value_ptr.* = dict.items.len;
-            try dict.append(val);
+            try dict.append(allocator, val);
         }
-        try arr.append(result.value_ptr.*);
+        try arr.append(allocator, result.value_ptr.*);
     }
 
     return Self{

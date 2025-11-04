@@ -2,7 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const endian = builtin.cpu.arch.endian();
 
-pub fn writeSlice(w: *std.io.Writer, arr: anytype) !void {
+pub fn writeSlice(w: *std.Io.Writer, arr: anytype) !void {
     const T = @TypeOf(arr[0]);
     try w.writeInt(u64, arr.len, endian);
     const byte_len = arr.len * @sizeOf(T);

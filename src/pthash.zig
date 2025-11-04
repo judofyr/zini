@@ -203,7 +203,7 @@ pub fn HashFn(
             // Step 2: Group the entries into buckets ordered by size.
 
             var bucket_summaries = try std.ArrayList(BucketSummary).initCapacity(allocator, bucketer.m);
-            defer bucket_summaries.deinit();
+            defer bucket_summaries.deinit(allocator);
 
             var bucket_start: usize = 0;
             var bucket_idx: usize = 0;

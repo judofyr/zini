@@ -36,18 +36,20 @@ pub fn get(self: *const StringDict, idx: u64) []const u8 {
 }
 
 pub const Builder = struct {
+    allocator: std.mem.Allocator,
     dict_values: std.ArrayList(u8),
     dict_positions: std.StringHashMap(usize),
 
     pub fn init(allocator: std.mem.Allocator) !Builder {
         return Builder{
-            .dict_values = std.ArrayList(u8).init(allocator),
+            .allocator = allocator,
+            .dict_values = .empty,
             .dict_positions = std.StringHashMap(usize).init(allocator),
         };
     }
 
     pub fn deinit(self: *Builder) void {
-        self.dict_values.deinit();
+        self.dict_values.deinit(self.allocator);
         self.dict_positions.deinit();
         self.* = undefined;
     }
@@ -56,9 +58,9 @@ pub const Builder = struct {
         const result = try self.dict_positions.getOrPut(key);
         if (!result.found_existing) {
             result.value_ptr.* = self.dict_values.items.len;
-            try self.dict_values.append(@intCast(key.len));
+            try self.dict_values.append(self.allocator, @intCast(key.len));
             for (key) |byte| {
-                try self.dict_values.append(byte);
+                try self.dict_values.append(self.allocator, byte);
             }
         }
         return result.value_ptr.*;
@@ -66,7 +68,7 @@ pub const Builder = struct {
 
     pub fn build(self: *Builder) !StringDict {
         return StringDict{
-            .dict = try self.dict_values.toOwnedSlice(),
+            .dict = try self.dict_values.toOwnedSlice(self.allocator),
         };
     }
 };

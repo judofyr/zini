@@ -641,8 +641,38 @@ pub fn Ribbon(
             }
         };
 
+        fn BoundedArray(comptime T: type, n: comptime_int) type {
+            return struct {
+                const Arr = @This();
+
+                len: usize,
+                data: [n]T,
+
+                fn init() Arr {
+                    return .{ .len = 0, .data = undefined };
+                }
+
+                fn capacity(_: *Arr) usize {
+                    return n;
+                }
+
+                fn constSlice(self: *const Arr) []const T {
+                    return self.data[0..self.len];
+                }
+
+                fn slice(self: *Arr) []T {
+                    return self.data[0..self.len];
+                }
+
+                fn appendAssumeCapacity(self: *Arr, item: T) void {
+                    self.data[self.len] = item;
+                    self.len += 1;
+                }
+            };
+        }
+
         pub const Bumped = struct {
-            const Layers = std.BoundedArray(BumpedLayer, 4);
+            const Layers = BoundedArray(BumpedLayer, 4);
 
             w: u6,
             seed: u64,
@@ -660,7 +690,7 @@ pub fn Ribbon(
             pub fn lookup(self: *const Bumped, key: Key) u64 {
                 const hash1 = hasher(self.seed, key);
                 const hash2 = hasher(self.seed + 1, key);
-                for (self.layers.slice()) |layer| {
+                for (self.layers.constSlice()) |layer| {
                     const h = splitHash(hash1, hash2, layer.table.n, self.w);
                     if (layer.lookup(h.i, h.c)) |result| {
                         return result;
@@ -672,7 +702,7 @@ pub fn Ribbon(
 
             pub fn bits(self: Bumped) usize {
                 var result = self.fallback_table.bits();
-                for (self.layers.slice()) |layer| {
+                for (self.layers.constSlice()) |layer| {
                     result += layer.bits();
                 }
                 return result;
@@ -682,7 +712,7 @@ pub fn Ribbon(
                 try w.writeInt(u64, self.w, endian);
                 try w.writeInt(u64, self.seed, endian);
                 try w.writeInt(u64, self.layers.len, endian);
-                for (self.layers.slice()) |layer| {
+                for (self.layers.constSlice()) |layer| {
                     try layer.writeTo(w);
                 }
                 try self.fallback_table.writeTo(w);
@@ -692,7 +722,7 @@ pub fn Ribbon(
                 const w = try r.takeInt(u64, endian);
                 const seed = try r.takeInt(u64, endian);
                 const layers_len = try r.takeInt(u64, endian);
-                var layers = Layers.init(0) catch unreachable;
+                var layers = Layers.init();
                 for (0..layers_len) |_| {
                     layers.appendAssumeCapacity(try BumpedLayer.readFrom(r));
                 }
@@ -728,7 +758,7 @@ pub fn Ribbon(
             }
 
             pub fn build(self: *BumpedBuilder, allocator: std.mem.Allocator) error{ OutOfMemory, HashCollision }!Bumped {
-                var layers = Bumped.Layers.init(0) catch unreachable;
+                var layers = Bumped.Layers.init();
                 errdefer {
                     for (layers.slice()) |*layer| {
                         layer.deinit(allocator);

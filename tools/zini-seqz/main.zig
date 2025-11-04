@@ -28,6 +28,9 @@ pub fn main() !void {
 
     const allocator = gpa.allocator();
 
+    var threaded = std.Io.Threaded.init(allocator);
+    defer threaded.deinit();
+
     var p = try parg.parseProcess(allocator, .{});
     defer p.deinit();
 
@@ -62,10 +65,10 @@ pub fn main() !void {
 
     var buf: [4096]u8 = undefined;
 
-    var r = file.reader(&buf);
+    var r = file.reader(threaded.io(), &buf);
 
-    var numbers = std.ArrayList(u64).init(allocator);
-    defer numbers.deinit();
+    var numbers: std.ArrayList(u64) = .empty;
+    defer numbers.deinit(allocator);
 
     std.debug.print("Reading {s}\n", .{f});
 
@@ -75,7 +78,7 @@ pub fn main() !void {
             else => return err,
         };
         const num = try std.fmt.parseInt(u64, line, 10);
-        try numbers.append(num);
+        try numbers.append(allocator, num);
     }
 
     std.mem.sort(u64, numbers.items, {}, std.sort.asc(u64));

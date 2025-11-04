@@ -98,7 +98,7 @@ test "encode" {
     const n = 100000;
 
     var result = try std.ArrayList(u64).initCapacity(testing.allocator, n);
-    defer result.deinit();
+    defer result.deinit(testing.allocator);
 
     var i: usize = 0;
     var prev: u64 = 0;

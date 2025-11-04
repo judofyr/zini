@@ -115,16 +115,19 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
         fail("-i/--input is required", .{});
     }
 
+    var threaded = std.Io.Threaded.init(allocator);
+    defer threaded.deinit();
+
     std.debug.print("Reading {s}...\n", .{input.?});
     var file = try std.fs.cwd().openFile(input.?, .{});
     defer file.close();
 
-    var reader = file.reader(&.{});
+    var reader = file.reader(threaded.io(), &.{});
     const data = try reader.interface.allocRemaining(allocator, .unlimited);
     defer allocator.free(data);
 
-    var keys = std.ArrayList([]const u8).init(allocator);
-    defer keys.deinit();
+    var keys: std.ArrayList([]const u8) = .empty;
+    defer keys.deinit(allocator);
 
     if (seed == null) {
         try std.posix.getrandom(std.mem.asBytes(&seed));
@@ -220,7 +223,7 @@ pub fn lookup(allocator: std.mem.Allocator, p: anytype) !void {
     }
 
     std.debug.print("Reading {s}...\n", .{input.?});
-    const buf = try std.fs.cwd().readFileAlloc(allocator, input.?, 10 * 1024 * 1024);
+    const buf = try std.fs.cwd().readFileAlloc(input.?, allocator, .unlimited);
     defer allocator.free(buf);
 
     var reader = std.Io.Reader.fixed(buf);

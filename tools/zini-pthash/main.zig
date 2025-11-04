@@ -43,6 +43,9 @@ pub fn main() !void {
 
     const allocator = gpa.allocator();
 
+    var threaded = std.Io.Threaded.init(allocator);
+    defer threaded.deinit();
+
     var p = try parg.parseProcess(allocator, .{});
     defer p.deinit();
 
@@ -55,9 +58,9 @@ pub fn main() !void {
             },
             .arg => |arg| {
                 if (std.mem.eql(u8, arg, "lookup")) {
-                    return lookup(allocator, &p);
+                    return lookup(allocator, threaded.io(), &p);
                 } else if (std.mem.eql(u8, arg, "build")) {
-                    return build(allocator, &p);
+                    return build(allocator, threaded.io(), &p);
                 } else {
                     fail("uknown argument: {s}", .{arg});
                 }
@@ -92,7 +95,7 @@ fn printHashStats(hash: HashFn, dict: ?StringDict, arr: ?zini.DictArray) !void {
     }
 }
 
-pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
+pub fn build(allocator: std.mem.Allocator, io: std.Io, p: anytype) !void {
     var params = zini.pthash.Params{ .c = 7, .alpha = 0.95 };
     var input: ?[]const u8 = null;
     var output: ?[]const u8 = null;
@@ -136,17 +139,17 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
     var file = try std.fs.cwd().openFile(input.?, .{});
     defer file.close();
 
-    var reader = file.reader(&.{});
+    var reader = file.reader(io, &.{});
     const data = try reader.interface.allocRemaining(allocator, .unlimited);
     defer allocator.free(data);
 
-    var keys = std.ArrayList([]const u8).init(allocator);
-    defer keys.deinit();
+    var keys: std.ArrayList([]const u8) = .empty;
+    defer keys.deinit(allocator);
 
     var iter = std.mem.tokenizeScalar(u8, data, '\n');
     while (iter.next()) |line| {
         var split = std.mem.splitScalar(u8, line, ' ');
-        try keys.append(split.next().?);
+        try keys.append(allocator, split.next().?);
     }
 
     std.debug.print("\n", .{});
@@ -204,7 +207,8 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
     }
 }
 
-pub fn lookup(allocator: std.mem.Allocator, p: anytype) !void {
+pub fn lookup(allocator: std.mem.Allocator, io: std.Io, p: anytype) !void {
+    _ = io;
     var stdout_buf: [4096]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
 
@@ -237,7 +241,7 @@ pub fn lookup(allocator: std.mem.Allocator, p: anytype) !void {
     }
 
     std.debug.print("Reading {s}...\n", .{input.?});
-    const buf = try std.fs.cwd().readFileAlloc(allocator, input.?, 10 * 1024 * 1024);
+    const buf = try std.fs.cwd().readFileAlloc(input.?, allocator, .unlimited);
     defer allocator.free(buf);
 
     var r = std.Io.Reader.fixed(buf);

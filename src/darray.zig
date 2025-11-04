@@ -213,10 +213,10 @@ test "dense" {
     var prng = std.Random.DefaultPrng.init(seed);
     const r = prng.random();
 
-    var result = std.ArrayList(usize).init(testing.allocator);
-    defer result.deinit();
-
     const n = 10000;
+
+    var result = try std.ArrayList(usize).initCapacity(testing.allocator, n);
+    defer result.deinit(testing.allocator);
 
     var bit_set = try std.DynamicBitSet.initEmpty(testing.allocator, n);
     defer bit_set.deinit();
@@ -224,7 +224,7 @@ test "dense" {
     var idx: usize = 0;
     while (idx < n) : (idx += 1) {
         if (r.boolean()) {
-            try result.append(idx);
+            result.appendAssumeCapacity(idx);
             bit_set.set(idx);
         }
     }
@@ -237,10 +237,10 @@ test "sparse" {
     var prng = std.Random.DefaultPrng.init(seed);
     const r = prng.random();
 
-    var result = std.ArrayList(usize).init(testing.allocator);
-    defer result.deinit();
-
     const n = 100000;
+
+    var result = try std.ArrayList(usize).initCapacity(testing.allocator, n);
+    defer result.deinit(testing.allocator);
 
     var bit_set = try std.DynamicBitSet.initEmpty(testing.allocator, n);
     defer bit_set.deinit();
@@ -248,7 +248,7 @@ test "sparse" {
     var idx: usize = 0;
     while (idx < n) : (idx += 1) {
         if (r.uintLessThan(u64, 100) == 0) {
-            try result.append(idx);
+            result.appendAssumeCapacity(idx);
             bit_set.set(idx);
         }
     }
