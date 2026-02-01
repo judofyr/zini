@@ -32,19 +32,13 @@ fn fail(comptime msg: []const u8, args: anytype) noreturn {
     std.debug.print("error: ", .{});
     std.debug.print(msg, args);
     std.debug.print("\n", .{});
-    std.posix.exit(1);
+    std.process.exit(1);
 }
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer {
-        const check = gpa.deinit();
-        if (check == .leak) @panic("memory leaked");
-    }
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
 
-    const allocator = gpa.allocator();
-
-    var p = try parg.parseProcess(allocator, .{});
+    var p = try parg.parseProcess(init, .{});
     defer p.deinit();
 
     const program_name = p.nextValue() orelse @panic("no executable name");
@@ -56,9 +50,9 @@ pub fn main() !void {
             },
             .arg => |arg| {
                 if (std.mem.eql(u8, arg, "lookup")) {
-                    return lookup(allocator, &p);
+                    return lookup(allocator, init.io, &p);
                 } else if (std.mem.eql(u8, arg, "build")) {
-                    return build(allocator, &p);
+                    return build(allocator, init.io, &p);
                 } else {
                     fail("uknown argument: {s}", .{arg});
                 }
@@ -77,7 +71,7 @@ fn printStats(table: anytype, n: usize) !void {
     std.debug.print("  bits/n: {d}\n", .{@as(f64, @floatFromInt(bits)) / @as(f64, @floatFromInt(n))});
 }
 
-pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
+pub fn build(allocator: std.mem.Allocator, io: std.Io, p: anytype) !void {
     var w: u6 = 32;
     var input: ?[]const u8 = null;
     var output: ?[]const u8 = null;
@@ -115,14 +109,11 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
         fail("-i/--input is required", .{});
     }
 
-    var threaded = std.Io.Threaded.init(allocator);
-    defer threaded.deinit();
-
     std.debug.print("Reading {s}...\n", .{input.?});
-    var file = try std.fs.cwd().openFile(input.?, .{});
-    defer file.close();
+    var file = try std.Io.Dir.cwd().openFile(io, input.?, .{});
+    defer file.close(io);
 
-    var reader = file.reader(threaded.io(), &.{});
+    var reader = file.reader(io, &.{});
     const data = try reader.interface.allocRemaining(allocator, .unlimited);
     defer allocator.free(data);
 
@@ -130,7 +121,7 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
     defer keys.deinit(allocator);
 
     if (seed == null) {
-        try std.posix.getrandom(std.mem.asBytes(&seed));
+        io.random(std.mem.asBytes(&seed));
     }
 
     var max_val: u64 = 0;
@@ -178,10 +169,10 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
         std.debug.print("\n", .{});
         std.debug.print("Writing to {s}\n", .{o});
         var buf: [4096]u8 = undefined;
-        const outfile = try std.fs.cwd().createFile(o, .{});
-        defer outfile.close();
+        const outfile = try std.Io.Dir.cwd().createFile(io, o, .{});
+        defer outfile.close(io);
 
-        var writer = outfile.writer(&buf);
+        var writer = outfile.writer(io, &buf);
 
         try writer.interface.writeInt(u64, n, endian);
         try table.writeTo(&writer.interface);
@@ -190,9 +181,9 @@ pub fn build(allocator: std.mem.Allocator, p: anytype) !void {
     }
 }
 
-pub fn lookup(allocator: std.mem.Allocator, p: anytype) !void {
+pub fn lookup(allocator: std.mem.Allocator, io: std.Io, p: anytype) !void {
     var stdout_buf: [4096]u8 = undefined;
-    var stdout = std.fs.File.stdout().writer(&stdout_buf);
+    var stdout = std.Io.File.stdout().writer(io, &stdout_buf);
 
     var input: ?[]const u8 = null;
     var key: ?[]const u8 = null;
@@ -223,7 +214,7 @@ pub fn lookup(allocator: std.mem.Allocator, p: anytype) !void {
     }
 
     std.debug.print("Reading {s}...\n", .{input.?});
-    const buf = try std.fs.cwd().readFileAlloc(input.?, allocator, .unlimited);
+    const buf = try std.Io.Dir.cwd().readFileAlloc(io, input.?, allocator, .unlimited);
     defer allocator.free(buf);
 
     var reader = std.Io.Reader.fixed(buf);

@@ -31,22 +31,13 @@ fn fail(comptime msg: []const u8, args: anytype) noreturn {
     std.debug.print("error: ", .{});
     std.debug.print(msg, args);
     std.debug.print("\n", .{});
-    std.posix.exit(1);
+    std.process.exit(1);
 }
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer {
-        const check = gpa.deinit();
-        if (check == .leak) @panic("memory leaked");
-    }
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
 
-    const allocator = gpa.allocator();
-
-    var threaded = std.Io.Threaded.init(allocator);
-    defer threaded.deinit();
-
-    var p = try parg.parseProcess(allocator, .{});
+    var p = try parg.parseProcess(init, .{});
     defer p.deinit();
 
     const program_name = p.nextValue() orelse @panic("no executable name");
@@ -58,9 +49,9 @@ pub fn main() !void {
             },
             .arg => |arg| {
                 if (std.mem.eql(u8, arg, "lookup")) {
-                    return lookup(allocator, threaded.io(), &p);
+                    return lookup(allocator, init.io, &p);
                 } else if (std.mem.eql(u8, arg, "build")) {
-                    return build(allocator, threaded.io(), &p);
+                    return build(allocator, init.io, &p);
                 } else {
                     fail("uknown argument: {s}", .{arg});
                 }
@@ -136,8 +127,8 @@ pub fn build(allocator: std.mem.Allocator, io: std.Io, p: anytype) !void {
     }
 
     std.debug.print("Reading {s}...\n", .{input.?});
-    var file = try std.fs.cwd().openFile(input.?, .{});
-    defer file.close();
+    var file = try std.Io.Dir.cwd().openFile(io, input.?, .{});
+    defer file.close(io);
 
     var reader = file.reader(io, &.{});
     const data = try reader.interface.allocRemaining(allocator, .unlimited);
@@ -154,7 +145,12 @@ pub fn build(allocator: std.mem.Allocator, io: std.Io, p: anytype) !void {
 
     std.debug.print("\n", .{});
     std.debug.print("Building hash function...\n", .{});
-    var hash = try HashFn.build(allocator, keys.items, params, seed);
+    var hash: HashFn = undefined;
+    if (seed) |s| {
+        hash = try HashFn.buildUsingSeed(allocator, keys.items, params, s);
+    } else {
+        hash = try HashFn.buildUsingRandomSeed(allocator, io, keys.items, params, 1000);
+    }
     defer hash.deinit(allocator);
 
     var dict: ?StringDict = null;
@@ -190,11 +186,11 @@ pub fn build(allocator: std.mem.Allocator, io: std.Io, p: anytype) !void {
 
     if (output) |o| {
         std.debug.print("Writing to {s}\n", .{o});
-        const outfile = try std.fs.cwd().createFile(o, .{});
-        defer outfile.close();
+        const outfile = try std.Io.Dir.cwd().createFile(io, o, .{});
+        defer outfile.close(io);
 
         var buf: [4096]u8 = undefined;
-        var writer = outfile.writer(&buf);
+        var writer = outfile.writer(io, &buf);
 
         try hash.writeTo(&writer.interface);
 
@@ -208,9 +204,8 @@ pub fn build(allocator: std.mem.Allocator, io: std.Io, p: anytype) !void {
 }
 
 pub fn lookup(allocator: std.mem.Allocator, io: std.Io, p: anytype) !void {
-    _ = io;
     var stdout_buf: [4096]u8 = undefined;
-    var stdout = std.fs.File.stdout().writer(&stdout_buf);
+    var stdout = std.Io.File.stdout().writer(io, &stdout_buf);
 
     var input: ?[]const u8 = null;
     var key: ?[]const u8 = null;
@@ -241,7 +236,7 @@ pub fn lookup(allocator: std.mem.Allocator, io: std.Io, p: anytype) !void {
     }
 
     std.debug.print("Reading {s}...\n", .{input.?});
-    const buf = try std.fs.cwd().readFileAlloc(input.?, allocator, .unlimited);
+    const buf = try std.Io.Dir.cwd().readFileAlloc(io, input.?, allocator, .unlimited);
     defer allocator.free(buf);
 
     var r = std.Io.Reader.fixed(buf);

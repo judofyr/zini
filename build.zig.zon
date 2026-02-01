@@ -21,8 +21,8 @@
             // When updating this field to a new URL, be sure to delete the corresponding
             // `hash`, otherwise you are communicating that you expect to find the old hash at
             // the new URL.
-            .url = "git+https://github.com/judofyr/parg.git#0c8a79749b13d111eb1484f89c4eb3501248a2e3",
-            .hash = "parg-0.0.0-dOPWZPhYAAAX2bzGpU0RFDnEOCq-GBidEJYv1owRws8o",
+            .url = "https://github.com/judofyr/parg/archive/8c4af60afdb3ad211ad12cd329c2859f8593af19.tar.gz",
+            .hash = "parg-0.0.0-dOPWZENZAAAAyp9Lz-4zKPZ8PD7DEwUCEsiw6Y1UR_bA",
         },
     },
 

@@ -16,22 +16,13 @@ fn fail(comptime msg: []const u8, args: anytype) noreturn {
     std.debug.print("error: ", .{});
     std.debug.print(msg, args);
     std.debug.print("\n", .{});
-    std.posix.exit(1);
+    std.process.exit(1);
 }
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer {
-        const check = gpa.deinit();
-        if (check == .leak) @panic("memory leaked");
-    }
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
 
-    const allocator = gpa.allocator();
-
-    var threaded = std.Io.Threaded.init(allocator);
-    defer threaded.deinit();
-
-    var p = try parg.parseProcess(allocator, .{});
+    var p = try parg.parseProcess(init, .{});
     defer p.deinit();
 
     const program_name = p.nextValue() orelse @panic("no executable name");
@@ -60,12 +51,12 @@ pub fn main() !void {
     }
 
     const f = filename orelse fail("filename expected as argument", .{});
-    var file = try std.fs.cwd().openFile(f, .{});
-    defer file.close();
+    var file = try std.Io.Dir.cwd().openFile(init.io, f, .{});
+    defer file.close(init.io);
 
     var buf: [4096]u8 = undefined;
 
-    var r = file.reader(threaded.io(), &buf);
+    var r = file.reader(init.io, &buf);
 
     var numbers: std.ArrayList(u64) = .empty;
     defer numbers.deinit(allocator);
