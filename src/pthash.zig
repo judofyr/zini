@@ -101,9 +101,6 @@ pub const Params = struct {
     alpha: f64 = 1,
 };
 
-// Number of different seeds we try before we give up.
-const MAX_ATTEMPTS = 1000;
-
 /// A minimal perfect hash function for a given type and a hash function.
 pub fn HashFn(
     comptime Key: type,
@@ -143,21 +140,9 @@ pub fn HashFn(
             return self.pivots.bits() + self.free_slots.bits();
         }
 
-        pub fn build(
-            allocator: std.mem.Allocator,
-            keys: []const Key,
-            params: Params,
-            seed: ?u64,
-        ) !Self {
-            if (seed) |s| {
-                return buildUsingSeed(allocator, keys, params, s);
-            } else {
-                return buildUsingRandomSeed(allocator, keys, params, MAX_ATTEMPTS);
-            }
-        }
-
         pub fn buildUsingRandomSeed(
             allocator: std.mem.Allocator,
+            io: std.Io,
             keys: []const Key,
             params: Params,
             max_attempts: usize,
@@ -166,7 +151,7 @@ pub fn HashFn(
 
             var attempts: usize = 0;
             while (attempts < max_attempts) : (attempts += 1) {
-                try std.posix.getrandom(std.mem.asBytes(&seed));
+                io.random(std.mem.asBytes(&seed));
 
                 return buildUsingSeed(allocator, keys, params, seed) catch |err| switch (err) {
                     error.HashCollision => continue,
@@ -347,7 +332,7 @@ test "building" {
         data[i] = i * i;
     }
 
-    var h = try AutoHashFn(u64, CompactArray).buildUsingRandomSeed(testing.allocator, &data, .{ .c = 7, .alpha = 0.80 }, 10);
+    var h = try AutoHashFn(u64, CompactArray).buildUsingRandomSeed(testing.allocator, testing.io, &data, .{ .c = 7, .alpha = 0.80 }, 10);
     defer h.deinit(testing.allocator);
 
     var seen = std.hash_map.AutoHashMap(u64, usize).init(testing.allocator);
@@ -366,7 +351,7 @@ test "building" {
 
 test "collision detection" {
     var data: [2]u64 = .{ 5, 5 };
-    var h_result = AutoHashFn(u64, CompactArray).buildUsingRandomSeed(testing.allocator, &data, .{ .c = 7 }, 10);
+    var h_result = AutoHashFn(u64, CompactArray).buildUsingRandomSeed(testing.allocator, testing.io, &data, .{ .c = 7 }, 10);
     if (h_result) |*h| h.deinit(testing.allocator) else |_| {}
 
     try testing.expectError(error.HashCollision, h_result);
