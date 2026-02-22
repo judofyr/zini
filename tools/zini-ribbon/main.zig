@@ -235,16 +235,14 @@ pub fn lookup(allocator: std.mem.Allocator, io: std.Io, p: anytype) !void {
         if (bench) {
             const m = 1000;
             std.debug.print("\nBenchmarking...\n", .{});
-            var timer = try std.time.Timer.start();
-            const start = timer.lap();
+            const start_ts = std.Io.Clock.awake.now(io);
             var i: usize = 0;
             // TODO: Is this actually a good way of benchmarking?
             while (i < m) : (i += 1) {
                 std.mem.doNotOptimizeAway(table.lookup(k));
             }
-            const end = timer.read();
-            const dur = end - start;
-            std.debug.print("{} ns/read (avg of {} iterations)\n", .{ dur / m, m });
+            const dur = start_ts.untilNow(io, .awake);
+            std.debug.print("{} ns/read (avg of {} iterations)\n", .{ @divTrunc(dur.toNanoseconds(), n), n });
         }
     }
 }
