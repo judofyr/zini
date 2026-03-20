@@ -29,16 +29,16 @@ pub fn DArray(comptime val: bool) type {
         overflow_positions: []u64,
 
         pub fn init(allocator: std.mem.Allocator, bit_set: std.bit_set.DynamicBitSetUnmanaged) !Self {
-            var cur_block_positions = std.ArrayListUnmanaged(u63){};
+            var cur_block_positions = std.ArrayList(u63).empty;
             defer cur_block_positions.deinit(allocator);
 
-            var block_inventory = std.ArrayListUnmanaged(BlockPosition){};
+            var block_inventory = std.ArrayList(BlockPosition).empty;
             defer block_inventory.deinit(allocator);
 
-            var subblock_inventory = std.ArrayListUnmanaged(u16){};
+            var subblock_inventory = std.ArrayList(u16).empty;
             defer subblock_inventory.deinit(allocator);
 
-            var overflow_positions = std.ArrayListUnmanaged(u64){};
+            var overflow_positions = std.ArrayList(u64).empty;
             defer overflow_positions.deinit(allocator);
 
             try cur_block_positions.ensureTotalCapacity(allocator, block_size);
