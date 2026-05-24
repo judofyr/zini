@@ -217,7 +217,8 @@ test "encode #2" {
 }
 
 test "encode #3" {
-    const vals = [_]u64{255} ** 64;
+    var vals: [64]u64 = undefined;
+    @memset(&vals, 255);
     var arr = try Self.encode(testing.allocator, &vals);
     defer arr.deinit(testing.allocator);
 
