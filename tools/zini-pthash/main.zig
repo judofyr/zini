@@ -64,14 +64,14 @@ pub fn main(init: std.process.Init) !void {
 }
 
 fn printHashStats(hash: HashFn, dict: ?StringDict, arr: ?zini.DictArray) !void {
-    const bits = hash.bits() + @bitSizeOf(HashFn);
+    const bits = hash.bits() + @sizeOf(HashFn);
     std.debug.print("  seed: {}\n", .{hash.seed});
     std.debug.print("  bits: {}\n", .{bits});
     std.debug.print("  bits/n: {d}\n", .{@as(f64, @floatFromInt(bits)) / @as(f64, @floatFromInt(hash.n))});
     std.debug.print("\n", .{});
 
     if (dict != null) {
-        const dict_size = dict.?.bits() + @bitSizeOf(StringDict) + arr.?.bits() + @bitSizeOf(zini.DictArray);
+        const dict_size = dict.?.bits() + @sizeOf(StringDict) * 8 + arr.?.bits() + @sizeOf(zini.DictArray) * 8;
         std.debug.print("File contains dictionary as well:\n", .{});
         std.debug.print("  bits: {}\n", .{dict_size});
         std.debug.print("  bits/n: {d}\n", .{@as(f64, @floatFromInt(dict_size)) / @as(f64, @floatFromInt(hash.n))});

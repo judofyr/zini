@@ -65,7 +65,7 @@ pub fn main(init: std.process.Init) !void {
 }
 
 fn printStats(table: anytype, n: usize) !void {
-    const bits = table.bits() + @bitSizeOf(@TypeOf(table));
+    const bits = table.bits() + @sizeOf(@TypeOf(table)) * 8;
     std.debug.print("  seed: {}\n", .{table.seed});
     std.debug.print("  bits: {}\n", .{bits});
     std.debug.print("  bits/n: {d}\n", .{@as(f64, @floatFromInt(bits)) / @as(f64, @floatFromInt(n))});
