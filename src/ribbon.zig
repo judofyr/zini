@@ -251,7 +251,7 @@ const BumpedLayerBuilder = struct {
     m: usize,
     eps: f64,
     opts: BuildOptions,
-    input: std.ArrayListUnmanaged(Input),
+    input: std.ArrayList(Input),
 
     fn tableSizeFromEps(n: usize, eps: f64, w: u6) usize {
         const target: usize = @intFromFloat(@as(f64, @floatFromInt(n)) * (eps + 1));
@@ -259,7 +259,7 @@ const BumpedLayerBuilder = struct {
     }
 
     pub fn init(allocator: std.mem.Allocator, n: usize, eps: f64, opts: BuildOptions) error{OutOfMemory}!Self {
-        const input = try std.ArrayListUnmanaged(Input).initCapacity(allocator, n);
+        const input = try std.ArrayList(Input).initCapacity(allocator, n);
 
         return Self{
             .m = tableSizeFromEps(n, eps, opts.w),
@@ -301,7 +301,7 @@ const BumpedLayerBuilder = struct {
         var system = try RibbonBandingSystem.init(allocator, self.m, self.opts.r, self.opts.w);
         defer system.deinit(allocator);
 
-        var inserted = try std.ArrayListUnmanaged(?usize).initCapacity(allocator, bucket_size);
+        var inserted = try std.ArrayList(?usize).initCapacity(allocator, bucket_size);
         defer inserted.deinit(allocator);
 
         var thresholds = try CompactArray.Mutable.init(allocator, 2, std.math.divCeil(usize, self.m, bucket_size) catch unreachable);
@@ -389,7 +389,7 @@ const BumpedLayerBuilder = struct {
 
         // Prepare for the next layer
 
-        var next_inputs = try std.ArrayListUnmanaged(Input).initCapacity(allocator, bump_count);
+        var next_inputs = try std.ArrayList(Input).initCapacity(allocator, bump_count);
         errdefer next_inputs.deinit(allocator);
 
         var layer = BumpedLayer{
@@ -566,10 +566,10 @@ pub fn Ribbon(
 
             n: usize,
             seed: u64,
-            input: std.ArrayListUnmanaged(Input),
+            input: std.ArrayList(Input),
 
             pub fn init(allocator: std.mem.Allocator, n: usize, seed: u64) error{OutOfMemory}!IterativeBuilder {
-                const input = try std.ArrayListUnmanaged(Input).initCapacity(allocator, n);
+                const input = try std.ArrayList(Input).initCapacity(allocator, n);
 
                 return IterativeBuilder{
                     .n = n,

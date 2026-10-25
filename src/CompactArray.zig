@@ -36,7 +36,7 @@ pub fn get(self: *const Self, idx: usize) u64 {
         return (self.data[block] >> shift) & self.getMask();
     } else {
         const res_shift = ~shift + 1; //  =:=  @bitSizeOf(Int) - shift;
-        return (self.data[block] >> shift) | (self.data[block + 1] << res_shift & self.getMask());
+        return (self.data[block] >> shift) | ((self.data[block + 1] << res_shift) & self.getMask());
     }
 }
 
@@ -146,7 +146,7 @@ pub const Mutable = struct {
         //   Block 1: PP VVVVV PP
 
         // Here we need to make sure we don't zero out those upper paddings.
-        const upper_mask = ~@as(Int, 0) << self.width << shift;
+        const upper_mask = (~@as(Int, 0) << self.width) << shift;
         const lower_mask = ((@as(Int, 1) << shift) - 1);
 
         // Clear out VV by AND-ing 00111111;

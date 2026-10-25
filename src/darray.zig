@@ -73,10 +73,10 @@ pub fn DArray(comptime val: bool) type {
 
         fn flushCurBlock(
             allocator: std.mem.Allocator,
-            cur_block_positions: *std.ArrayListUnmanaged(u63),
-            block_inventory: *std.ArrayListUnmanaged(BlockPosition),
-            subblock_inventory: *std.ArrayListUnmanaged(u16),
-            overflow_positions: *std.ArrayListUnmanaged(u64),
+            cur_block_positions: *std.ArrayList(u63),
+            block_inventory: *std.ArrayList(BlockPosition),
+            subblock_inventory: *std.ArrayList(u16),
+            overflow_positions: *std.ArrayList(u64),
         ) !void {
             const fst = cur_block_positions.items[0];
             const lst = cur_block_positions.items[cur_block_positions.items.len - 1];
