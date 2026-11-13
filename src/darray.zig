@@ -19,7 +19,7 @@ pub fn DArray(comptime val: bool) type {
         const subblock_size: usize = 32;
         const max_in_block_distance: usize = 1 << 16;
 
-        const BlockPosition = packed struct {
+        const BlockPosition = bitpack struct {
             is_overflow: bool,
             pos: u63,
         };
